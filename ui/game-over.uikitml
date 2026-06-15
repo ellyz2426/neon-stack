@@ -1,0 +1,27 @@
+<panel width="500" height="520" backgroundColor="#0a0a1aee" borderRadius="16" borderWidth="2" borderColor="#ff444444" padding="24">
+  <container flexDirection="column" alignItems="center" gap="14" width="100%">
+    <text fontSize="40" fontWeight="bold" color="#ff4444">GAME OVER</text>
+    <container flexDirection="column" gap="6" alignItems="center">
+      <container flexDirection="row" gap="8" alignItems="center">
+        <text fontSize="14" color="#888899">SCORE</text>
+        <text id="final-score" fontSize="28" fontWeight="bold" color="#00ffff">0</text>
+      </container>
+      <container flexDirection="row" gap="8" alignItems="center">
+        <text fontSize="14" color="#888899">HEIGHT</text>
+        <text id="final-height" fontSize="28" fontWeight="bold" color="#ff00ff">0</text>
+      </container>
+      <container flexDirection="row" gap="8" alignItems="center">
+        <text fontSize="14" color="#888899">MAX COMBO</text>
+        <text id="final-combo" fontSize="28" fontWeight="bold" color="#00ff88">0</text>
+      </container>
+      <container flexDirection="row" gap="8" alignItems="center">
+        <text fontSize="14" color="#888899">BEST</text>
+        <text id="best-score" fontSize="20" fontWeight="bold" color="#ffaa00">0</text>
+      </container>
+    </container>
+    <container flexDirection="column" gap="10" width="80%">
+      <text id="btn-retry" fontSize="20" fontWeight="bold" color="#000000" backgroundColor="#00ffff" borderRadius="8" padding="14" textAlign="center">RETRY</text>
+      <text id="btn-menu" fontSize="18" color="#ff4444" backgroundColor="#ff444422" borderRadius="8" padding="12" textAlign="center" borderWidth="1" borderColor="#ff444444">MAIN MENU</text>
+    </container>
+  </container>
+</panel>

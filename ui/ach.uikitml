@@ -1,0 +1,57 @@
+<panel width="560" height="700" backgroundColor="#0a0a1aee" borderRadius="16" borderWidth="2" borderColor="#ff00ff44" padding="20">
+  <container flexDirection="column" alignItems="center" gap="6" width="100%">
+    <text fontSize="28" fontWeight="bold" color="#ff00ff">ACHIEVEMENTS</text>
+    <text id="ach-total" fontSize="14" color="#8888aa">0 / 44</text>
+    <container flexDirection="column" gap="3" width="100%">
+      <container flexDirection="row" justifyContent="space-between" padding="3">
+        <text id="ach-name-0" fontSize="13" fontWeight="bold" color="#ccccdd">???</text>
+        <text id="ach-desc-0" fontSize="12" color="#888899">Locked</text>
+      </container>
+      <container flexDirection="row" justifyContent="space-between" padding="3">
+        <text id="ach-name-1" fontSize="13" fontWeight="bold" color="#ccccdd">???</text>
+        <text id="ach-desc-1" fontSize="12" color="#888899">Locked</text>
+      </container>
+      <container flexDirection="row" justifyContent="space-between" padding="3">
+        <text id="ach-name-2" fontSize="13" fontWeight="bold" color="#ccccdd">???</text>
+        <text id="ach-desc-2" fontSize="12" color="#888899">Locked</text>
+      </container>
+      <container flexDirection="row" justifyContent="space-between" padding="3">
+        <text id="ach-name-3" fontSize="13" fontWeight="bold" color="#ccccdd">???</text>
+        <text id="ach-desc-3" fontSize="12" color="#888899">Locked</text>
+      </container>
+      <container flexDirection="row" justifyContent="space-between" padding="3">
+        <text id="ach-name-4" fontSize="13" fontWeight="bold" color="#ccccdd">???</text>
+        <text id="ach-desc-4" fontSize="12" color="#888899">Locked</text>
+      </container>
+      <container flexDirection="row" justifyContent="space-between" padding="3">
+        <text id="ach-name-5" fontSize="13" fontWeight="bold" color="#ccccdd">???</text>
+        <text id="ach-desc-5" fontSize="12" color="#888899">Locked</text>
+      </container>
+      <container flexDirection="row" justifyContent="space-between" padding="3">
+        <text id="ach-name-6" fontSize="13" fontWeight="bold" color="#ccccdd">???</text>
+        <text id="ach-desc-6" fontSize="12" color="#888899">Locked</text>
+      </container>
+      <container flexDirection="row" justifyContent="space-between" padding="3">
+        <text id="ach-name-7" fontSize="13" fontWeight="bold" color="#ccccdd">???</text>
+        <text id="ach-desc-7" fontSize="12" color="#888899">Locked</text>
+      </container>
+      <container flexDirection="row" justifyContent="space-between" padding="3">
+        <text id="ach-name-8" fontSize="13" fontWeight="bold" color="#ccccdd">???</text>
+        <text id="ach-desc-8" fontSize="12" color="#888899">Locked</text>
+      </container>
+      <container flexDirection="row" justifyContent="space-between" padding="3">
+        <text id="ach-name-9" fontSize="13" fontWeight="bold" color="#ccccdd">???</text>
+        <text id="ach-desc-9" fontSize="12" color="#888899">Locked</text>
+      </container>
+      <container flexDirection="row" justifyContent="space-between" padding="3">
+        <text id="ach-name-10" fontSize="13" fontWeight="bold" color="#ccccdd">???</text>
+        <text id="ach-desc-10" fontSize="12" color="#888899">Locked</text>
+      </container>
+      <container flexDirection="row" justifyContent="space-between" padding="3">
+        <text id="ach-name-11" fontSize="13" fontWeight="bold" color="#ccccdd">???</text>
+        <text id="ach-desc-11" fontSize="12" color="#888899">Locked</text>
+      </container>
+    </container>
+    <text id="btn-ach-back" fontSize="18" color="#ff4444" backgroundColor="#ff444422" borderRadius="8" padding="10" textAlign="center" borderWidth="1" borderColor="#ff444444" width="80%">BACK</text>
+  </container>
+</panel>

@@ -1,0 +1,40 @@
+<panel width="480" height="460" backgroundColor="#0a0a1aee" borderRadius="16" borderWidth="2" borderColor="#00ff8844" padding="24">
+  <container flexDirection="column" alignItems="center" gap="8" width="100%">
+    <text fontSize="28" fontWeight="bold" color="#00ff88">STATISTICS</text>
+    <container flexDirection="column" gap="5" width="100%">
+      <container flexDirection="row" justifyContent="space-between" padding="3">
+        <text fontSize="14" color="#888899">Games Played</text>
+        <text id="stat-games" fontSize="14" fontWeight="bold" color="#ccccdd">0</text>
+      </container>
+      <container flexDirection="row" justifyContent="space-between" padding="3">
+        <text fontSize="14" color="#888899">Total Blocks</text>
+        <text id="stat-blocks" fontSize="14" fontWeight="bold" color="#ccccdd">0</text>
+      </container>
+      <container flexDirection="row" justifyContent="space-between" padding="3">
+        <text fontSize="14" color="#888899">Perfect Placements</text>
+        <text id="stat-perfects" fontSize="14" fontWeight="bold" color="#00ff88">0</text>
+      </container>
+      <container flexDirection="row" justifyContent="space-between" padding="3">
+        <text fontSize="14" color="#888899">Perfect Rate</text>
+        <text id="stat-perfect-pct" fontSize="14" fontWeight="bold" color="#00ff88">0.0%</text>
+      </container>
+      <container flexDirection="row" justifyContent="space-between" padding="3">
+        <text fontSize="14" color="#888899">Best Height</text>
+        <text id="stat-best-height" fontSize="14" fontWeight="bold" color="#ff00ff">0</text>
+      </container>
+      <container flexDirection="row" justifyContent="space-between" padding="3">
+        <text fontSize="14" color="#888899">Best Combo</text>
+        <text id="stat-best-combo" fontSize="14" fontWeight="bold" color="#ffaa00">0</text>
+      </container>
+      <container flexDirection="row" justifyContent="space-between" padding="3">
+        <text fontSize="14" color="#888899">Best Score</text>
+        <text id="stat-best-score" fontSize="14" fontWeight="bold" color="#00ffff">0</text>
+      </container>
+      <container flexDirection="row" justifyContent="space-between" padding="3">
+        <text fontSize="14" color="#888899">Total Score</text>
+        <text id="stat-total-score" fontSize="14" fontWeight="bold" color="#00ffff">0</text>
+      </container>
+    </container>
+    <text id="btn-stats-back" fontSize="18" color="#ff4444" backgroundColor="#ff444422" borderRadius="8" padding="10" textAlign="center" borderWidth="1" borderColor="#ff444444" width="80%">BACK</text>
+  </container>
+</panel>

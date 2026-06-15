@@ -1,5 +1,5 @@
-<panel width="480" height="600" backgroundColor="#0a0a1aee" borderRadius="16" borderWidth="2" borderColor="#44aaff44" padding="24">
-  <container flexDirection="column" alignItems="center" gap="10" width="100%">
+<panel width="480" height="640" backgroundColor="#0a0a1aee" borderRadius="16" borderWidth="2" borderColor="#44aaff44" padding="24">
+  <container flexDirection="column" alignItems="center" gap="8" width="100%">
     <text fontSize="28" fontWeight="bold" color="#44aaff">HOW TO PLAY</text>
     <container flexDirection="column" gap="5" width="100%">
       <text fontSize="14" color="#ccccdd">Blocks slide back and forth.</text>
@@ -22,12 +22,14 @@
       <text fontSize="13" color="#ccccdd">7 combo = Width Boost (block grows)</text>
       <text fontSize="13" color="#ffdd00">10 combo = 2X Score (8 seconds)</text>
       <text fontSize="13" color="#bb44ff">12 combo = Magnet (auto-perfect next)</text>
+      <text fontSize="13" color="#88ccff">15 combo = Freeze (block stops briefly)</text>
     </container>
     <container flexDirection="column" gap="3" width="100%">
       <text fontSize="16" fontWeight="bold" color="#00ff88">Tips</text>
       <text fontSize="13" color="#ccccdd">5+ combo = blocks grow back!</text>
-      <text fontSize="13" color="#ccccdd">Watch the danger warning on HUD!</text>
+      <text fontSize="13" color="#ccccdd">8+ combo triggers FEVER MODE!</text>
       <text fontSize="13" color="#ccccdd">Wind picks up at higher heights!</text>
+      <text fontSize="13" color="#ccccdd">Endless mode has rising waves!</text>
       <text fontSize="13" color="#ccccdd">Change themes in Settings!</text>
     </container>
     <text id="btn-tutorial-back" fontSize="18" color="#ff4444" backgroundColor="#ff444422" borderRadius="8" padding="10" textAlign="center" borderWidth="1" borderColor="#ff444444" width="80%">BACK</text>

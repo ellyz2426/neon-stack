@@ -187,6 +187,19 @@ interface NearMissFlash {
 	text: string;
 }
 
+interface WeatherParticle {
+	mesh: Mesh;
+	velocity: Vector3;
+	life: number;
+}
+
+interface WaveInfo {
+	wave: number;
+	speedMult: number;
+	windMult: number;
+	scoreBonus: number;
+}
+
 // == Audio Engine ===========================================================
 
 class AudioEngine {
@@ -631,7 +644,7 @@ export class GameSystem extends createSystem({}) {
 
 	// Round 5: Height milestone markers
 	private milestoneMarkers: MilestoneMarker[] = [];
-	private milestoneHeights = [25, 50, 75, 100, 120];
+	private milestoneHeights = [25, 50, 75, 100, 120, 150];
 
 	// Round 5: Session comparison
 	private lastSession: SessionRecord | null = null;
@@ -661,6 +674,29 @@ export class GameSystem extends createSystem({}) {
 
 	// Round 6: Theme tracking (for all_themes achievement)
 	private themesPlayed = new Set<ColorTheme>();
+
+	// Round 7: Fever mode
+	private feverActive = false;
+	private feverIntensity = 0;
+	private feverTime = 0;
+
+	// Round 7: Freeze power-up
+	private freezeActive = false;
+	private freezeTimer = 0;
+	private freezeDuration = 2.5;
+
+	// Round 7: Weather particles
+	private weatherParticles: WeatherParticle[] = [];
+	private weatherGroup!: Group;
+	private weatherSpawnTimer = 0;
+
+	// Round 7: Endless wave system
+	private endlessWave: WaveInfo = { wave: 1, speedMult: 1, windMult: 1, scoreBonus: 0 };
+	private waveAnnouncerTimer = 0;
+	private waveBlocksThreshold = 20;
+
+	// Round 7: Power-up usage tracking
+	private powerUpsUsed = 0;
 
 	bootstrap(world: World) {
 		this.w = world;
@@ -708,6 +744,8 @@ export class GameSystem extends createSystem({}) {
 		scene.add(this.confettiGroup);
 		this.speedLineGroup = new Group();
 		scene.add(this.speedLineGroup);
+		this.weatherGroup = new Group();
+		scene.add(this.weatherGroup);
 		this.createGrid(scene);
 		this.createStars(scene);
 		this.createAurora(scene);
@@ -981,6 +1019,15 @@ export class GameSystem extends createSystem({}) {
 		this.magnetActive = false;
 		this.sessionNearMisses = 0;
 		this.themesPlayed.add(this.colorTheme);
+		// Round 7 resets
+		this.feverActive = false; this.feverIntensity = 0; this.feverTime = 0;
+		this.freezeActive = false; this.freezeTimer = 0;
+		this.endlessWave = { wave: 1, speedMult: 1, windMult: 1, scoreBonus: 0 };
+		this.waveAnnouncerTimer = 0;
+		this.powerUpsUsed = 0;
+		// Clear weather particles
+		for (const wp of this.weatherParticles) { this.weatherGroup.remove(wp.mesh); wp.mesh.geometry.dispose(); (wp.mesh.material as MeshBasicMaterial).dispose(); }
+		this.weatherParticles = [];
 		// Clear speed lines
 		for (const sl of this.speedLines) { this.speedLineGroup.remove(sl.mesh); sl.mesh.geometry.dispose(); (sl.mesh.material as MeshBasicMaterial).dispose(); }
 		this.speedLines = [];
@@ -1024,6 +1071,9 @@ export class GameSystem extends createSystem({}) {
 		// Clear speed lines
 		for (const sl of this.speedLines) { this.speedLineGroup.remove(sl.mesh); sl.mesh.geometry.dispose(); (sl.mesh.material as MeshBasicMaterial).dispose(); }
 		this.speedLines = [];
+		// Clear weather particles
+		for (const wp of this.weatherParticles) { this.weatherGroup.remove(wp.mesh); wp.mesh.geometry.dispose(); (wp.mesh.material as MeshBasicMaterial).dispose(); }
+		this.weatherParticles = [];
 		this.destroyGhost();
 		this.comboFlashTime = 0;
 		this.shakeIntensity = 0;
@@ -1294,6 +1344,7 @@ export class GameSystem extends createSystem({}) {
 		this.checkAchievements();
 		this.checkPowerUpEarns();
 		this.checkMilestones();
+		this.checkEndlessWave();
 		this.updateHUD();
 		this.updateBlockGlows();
 		if (cur.width < 0.1 || cur.depth < 0.1) { this.gameOver(); return; }
@@ -1354,6 +1405,7 @@ export class GameSystem extends createSystem({}) {
 		if (type === 'slowmo') {
 			this.slideSpeed *= 0.4;
 			this.showPowerUpNotify('SLOW-MO!', '#ffaa00');
+			this.powerUpsUsed++;
 		} else if (type === 'widthboost') {
 			if (this.currentBlock) {
 				this.currentBlock.width = Math.min(BASE_WIDTH, this.currentBlock.width + 0.5);
@@ -1362,16 +1414,19 @@ export class GameSystem extends createSystem({}) {
 				this.currentBlock.mesh.geometry = new BoxGeometry(this.currentBlock.width, BLOCK_HEIGHT, this.currentBlock.depth);
 			}
 			this.showPowerUpNotify('WIDTH BOOST!', '#00ff88');
+			this.powerUpsUsed++;
 			pu.active = false; // instant
 		} else if (type === 'shield') {
 			this.shieldActive = true;
 			this.createShieldVisual();
 			this.showPowerUpNotify('SHIELD!', '#00ccff');
+			this.powerUpsUsed++;
 			this.unlock('shield_earn');
 			pu.active = false; // passive, not timer-based
 		} else if (type === 'multiplier') {
 			this.multiplierTimer = 8;
 			this.showPowerUpNotify('2X SCORE!', '#ffdd00');
+			this.powerUpsUsed++;
 			this.unlock('multiplier_earn');
 			pu.active = false; // tracked separately
 		}
@@ -1592,6 +1647,25 @@ export class GameSystem extends createSystem({}) {
 			this.audio.playLevelUp();
 			this.unlock('magnet_earn');
 		}
+		// Freeze at 15 combo
+		if (this.combo >= 15 && !this.freezeActive && this.freezeTimer <= 0) {
+			this.freezeActive = true;
+			this.freezeTimer = this.freezeDuration;
+			this.showPowerUpNotify('FREEZE!', '#aaddff');
+			this.audio.playLevelUp();
+			this.powerUpsUsed++;
+			this.unlock('freeze_earn');
+		}
+		// Fever mode at 8+ combo
+		if (this.combo >= 8 && !this.feverActive) {
+			this.feverActive = true;
+			this.feverIntensity = 1;
+			this.feverTime = 0;
+			this.unlock('fever_mode');
+		} else if (this.combo < 5) {
+			this.feverActive = false;
+			this.feverIntensity = 0;
+		}
 		// Reset flags when combo breaks so they can be re-earned
 	}
 
@@ -1782,7 +1856,7 @@ export class GameSystem extends createSystem({}) {
 	private spawnMilestoneMarker(h: number) {
 		const y = h * BLOCK_HEIGHT + BLOCK_HEIGHT / 2;
 		const geo = new TorusGeometry(2.5, 0.02, 8, 64);
-		const color = h >= 120 ? 0xffffff : h >= 100 ? 0xffdd00 : h >= 75 ? 0xff4488 : h >= 50 ? 0x44ffaa : 0x44aaff;
+		const color = h >= 150 ? 0xff00ff : h >= 120 ? 0xffffff : h >= 100 ? 0xffdd00 : h >= 75 ? 0xff4488 : h >= 50 ? 0x44ffaa : 0x44aaff;
 		const mat = new MeshBasicMaterial({
 			color, transparent: true, opacity: 0.4, blending: AdditiveBlending, depthWrite: false,
 		});
@@ -1974,6 +2048,157 @@ export class GameSystem extends createSystem({}) {
 		});
 	}
 
+	// == Weather Particle System ==============================================
+
+	private spawnWeatherParticle() {
+		const cam = this.w.camera;
+		let color: number, size: number, speed: number, spread: number;
+		switch (this.colorTheme) {
+			case 'fire':
+				color = [0xff4400, 0xff6600, 0xff8800, 0xffaa00][Math.floor(Math.random() * 4)];
+				size = 0.03 + Math.random() * 0.04;
+				speed = 0.5 + Math.random() * 1.5;
+				spread = 15;
+				break;
+			case 'ice':
+				color = [0xccddff, 0xaabbff, 0xeeffff, 0x88aaff][Math.floor(Math.random() * 4)];
+				size = 0.04 + Math.random() * 0.06;
+				speed = 0.8 + Math.random() * 1.0;
+				spread = 20;
+				break;
+			case 'vapor':
+				color = [0xff88cc, 0xaa66ff, 0x88ffdd, 0xff66aa][Math.floor(Math.random() * 4)];
+				size = 0.05 + Math.random() * 0.05;
+				speed = 0.3 + Math.random() * 0.8;
+				spread = 18;
+				break;
+			default: // neon
+				color = [0x00ffff, 0x00ff88, 0x44aaff, 0xaa44ff][Math.floor(Math.random() * 4)];
+				size = 0.02 + Math.random() * 0.03;
+				speed = 1.0 + Math.random() * 2.0;
+				spread = 16;
+				break;
+		}
+		const mat = new MeshBasicMaterial({
+			color, transparent: true, opacity: 0.25 + Math.random() * 0.15,
+			blending: AdditiveBlending, depthWrite: false,
+		});
+		const geo = this.colorTheme === 'ice'
+			? new BoxGeometry(size, size * 0.3, size)
+			: new SphereGeometry(size, 4, 4);
+		const mesh = new Mesh(geo, mat);
+		mesh.position.set(
+			cam.position.x + (Math.random() - 0.5) * spread,
+			cam.position.y + 8 + Math.random() * 5,
+			cam.position.z + (Math.random() - 0.5) * spread,
+		);
+		this.weatherGroup.add(mesh);
+		const vx = (Math.random() - 0.5) * 0.8;
+		const vy = this.colorTheme === 'fire' ? speed : -speed;
+		const vz = (Math.random() - 0.5) * 0.8;
+		this.weatherParticles.push({
+			mesh, life: 4 + Math.random() * 3,
+			velocity: new Vector3(vx, vy, vz),
+		});
+	}
+
+	private updateWeatherParticles(delta: number) {
+		// Spawn
+		this.weatherSpawnTimer -= delta;
+		if (this.weatherSpawnTimer <= 0 && this.weatherParticles.length < 80) {
+			this.spawnWeatherParticle();
+			this.weatherSpawnTimer = 0.08 + Math.random() * 0.12;
+		}
+		// Update
+		for (let i = this.weatherParticles.length - 1; i >= 0; i--) {
+			const wp = this.weatherParticles[i];
+			wp.life -= delta;
+			wp.mesh.position.add(wp.velocity.clone().multiplyScalar(delta));
+			// Gentle sway
+			wp.mesh.position.x += Math.sin(wp.life * 2 + i) * delta * 0.3;
+			if (this.colorTheme === 'ice') wp.mesh.rotation.y += delta * 2;
+			if (this.colorTheme === 'fire') {
+				wp.mesh.scale.multiplyScalar(1 - delta * 0.3);
+				(wp.mesh.material as MeshBasicMaterial).opacity = Math.max(0, wp.life / 4) * 0.3;
+			} else {
+				(wp.mesh.material as MeshBasicMaterial).opacity = Math.max(0, Math.min(1, wp.life / 2)) * 0.3;
+			}
+			if (wp.life <= 0 || wp.mesh.position.y < -5) {
+				this.weatherGroup.remove(wp.mesh);
+				wp.mesh.geometry.dispose();
+				(wp.mesh.material as MeshBasicMaterial).dispose();
+				this.weatherParticles.splice(i, 1);
+			}
+		}
+	}
+
+	// == Fever Mode =======================================================
+
+	private updateFeverMode(delta: number) {
+		if (!this.feverActive) {
+			if (this.feverIntensity > 0) {
+				this.feverIntensity = Math.max(0, this.feverIntensity - delta * 2);
+			}
+			return;
+		}
+		this.feverTime += delta;
+		// Pulse intensity
+		this.feverIntensity = 0.6 + Math.sin(this.feverTime * 6) * 0.4;
+		// Boost ambient light
+		if (this.ambientLight) {
+			this.ambientLight.intensity = 0.8 + this.feverIntensity * 0.8;
+		}
+		// Pulse tower lights
+		for (const tl of this.towerLights) {
+			tl.intensity = 1.5 + this.feverIntensity * 3;
+		}
+		// Extra trail particles during fever
+		if (this.currentBlock && Math.random() < 0.7) {
+			this.spawnTrail();
+		}
+	}
+
+	// == Freeze Power-up ==================================================
+
+	private updateFreeze(delta: number) {
+		if (!this.freezeActive || this.freezeTimer <= 0) return;
+		this.freezeTimer -= delta;
+		if (this.freezeTimer <= 0) {
+			this.freezeActive = false;
+			this.freezeTimer = 0;
+		}
+	}
+
+	// == Endless Wave System ==============================================
+
+	private checkEndlessWave() {
+		if (this.mode !== 'endless') return;
+		const nextWave = Math.floor((this.height - 1) / this.waveBlocksThreshold) + 1;
+		if (nextWave > this.endlessWave.wave) {
+			this.endlessWave.wave = nextWave;
+			this.endlessWave.speedMult = 1 + (nextWave - 1) * 0.15;
+			this.endlessWave.windMult = 1 + (nextWave - 1) * 0.25;
+			this.endlessWave.scoreBonus = (nextWave - 1) * 5;
+			// Wave bonus score
+			this.score += nextWave * 50;
+			// Show wave announcement
+			this.showComboAnnounce(0); // reuse announcer
+			const d = this.getDoc(this.comboAnnounceEntity);
+			if (d) {
+				(d.getElementById('combo-text') as UIKit.Text | undefined)?.setProperties({ text: `WAVE ${nextWave}` });
+				const waveSub = nextWave >= 5 ? 'EXTREME' : nextWave >= 3 ? 'INTENSE' : 'HARDER';
+				(d.getElementById('combo-sub') as UIKit.Text | undefined)?.setProperties({ text: waveSub });
+			}
+			this.comboAnnounceTimer = 2.0;
+			this.audio.playLevelUp();
+			// Confetti for wave completion
+			const lastBlock = this.blocks[this.blocks.length - 1];
+			if (lastBlock) this.spawnConfetti(lastBlock.mesh.position, 40);
+			this.unlock('endless_wave_3');
+			if (nextWave >= 5) this.unlock('endless_wave_5');
+		}
+	}
+
 	// == Block glow scaling ===============================================
 
 	private updateBlockGlows() {
@@ -2027,6 +2252,8 @@ export class GameSystem extends createSystem({}) {
 		if (this.state === 'playing') {
 			this.gameTime += delta;
 			this.updatePowerUps(delta);
+			this.updateFeverMode(delta);
+			this.updateFreeze(delta);
 			// Score multiplier timer
 			if (this.multiplierTimer > 0) {
 				this.multiplierTimer -= delta;
@@ -2035,26 +2262,33 @@ export class GameSystem extends createSystem({}) {
 			if (this.height > 10) {
 				this.windTime += delta;
 				this.windDirection = Math.sin(this.windTime * 0.4) * Math.PI * 2;
-				this.windStrength = Math.min(1.2, (this.height - 10) * 0.03) * (0.5 + Math.sin(this.windTime * 0.7) * 0.5);
+				const windMult = this.mode === 'endless' ? this.endlessWave.windMult : 1;
+				this.windStrength = Math.min(1.2, (this.height - 10) * 0.03) * (0.5 + Math.sin(this.windTime * 0.7) * 0.5) * windMult;
 			}
 			if (this.currentBlock) {
+				const effectiveSpeed = this.freezeActive ? 0 : (this.slideSpeed * (this.mode === 'endless' ? this.endlessWave.speedMult : 1));
 				const p = this.currentBlock.mesh.position;
 				if (this.slideAxis === 'x') {
-					p.x += this.slideSpeed * this.slideDir * delta;
+					p.x += effectiveSpeed * this.slideDir * delta;
 					// Apply wind drift on the cross-axis
-					if (this.windStrength > 0) {
+					if (this.windStrength > 0 && !this.freezeActive) {
 						p.z += Math.sin(this.windDirection) * this.windStrength * delta * 0.3;
 					}
 					if (p.x > SLIDE_RANGE) { p.x = SLIDE_RANGE; this.slideDir = -1; }
 					if (p.x < -SLIDE_RANGE) { p.x = -SLIDE_RANGE; this.slideDir = 1; }
 				} else {
-					p.z += this.slideSpeed * this.slideDir * delta;
+					p.z += effectiveSpeed * this.slideDir * delta;
 					// Apply wind drift on the cross-axis
-					if (this.windStrength > 0) {
+					if (this.windStrength > 0 && !this.freezeActive) {
 						p.x += Math.cos(this.windDirection) * this.windStrength * delta * 0.3;
 					}
 					if (p.z > SLIDE_RANGE) { p.z = SLIDE_RANGE; this.slideDir = -1; }
 					if (p.z < -SLIDE_RANGE) { p.z = -SLIDE_RANGE; this.slideDir = 1; }
+				}
+				// Freeze visual: blue tint on block
+				if (this.freezeActive) {
+					(this.currentBlock.mesh.material as MeshStandardMaterial).emissive.setHex(0x88ccff);
+					(this.currentBlock.mesh.material as MeshStandardMaterial).emissiveIntensity = 0.6 + Math.sin(performance.now() * 0.01) * 0.2;
 				}
 				// Trail particles
 				if (Math.random() < 0.4) this.spawnTrail();
@@ -2276,6 +2510,16 @@ export class GameSystem extends createSystem({}) {
 		}
 		this.updateSpeedLines(delta);
 
+		// Weather particles (always during gameplay)
+		if (this.state === 'playing' || this.isCountingDown) {
+			this.updateWeatherParticles(delta);
+		}
+
+		// Wave announcer timer
+		if (this.waveAnnouncerTimer > 0) {
+			this.waveAnnouncerTimer -= delta;
+		}
+
 		// Near-miss flash timer
 		if (this.nearMissFlash.timer > 0) {
 			this.nearMissFlash.timer -= delta;
@@ -2376,6 +2620,23 @@ export class GameSystem extends createSystem({}) {
 
 		// Shield status
 		(d.getElementById('shield-status') as UIKit.Text | undefined)?.setProperties({ text: this.shieldActive ? 'SHIELD ACTIVE' : '' });
+		// Fever indicator
+		(d.getElementById('fever-status') as UIKit.Text | undefined)?.setProperties({
+			text: this.feverActive ? 'FEVER!' : '',
+		});
+		// Freeze indicator
+		if (this.freezeActive) {
+			(d.getElementById('freeze-status') as UIKit.Text | undefined)?.setProperties({
+				text: `FREEZE ${Math.ceil(this.freezeTimer)}s`,
+			});
+		} else {
+			(d.getElementById('freeze-status') as UIKit.Text | undefined)?.setProperties({ text: '' });
+		}
+		// Endless wave
+		if (this.mode === 'endless' && this.endlessWave.wave > 1) {
+			(d.getElementById('mode-info-label') as UIKit.Text | undefined)?.setProperties({ text: 'WAVE' });
+			(d.getElementById('mode-info') as UIKit.Text | undefined)?.setProperties({ text: `${this.endlessWave.wave}` });
+		}
 	}
 
 	private updateModeInfo() {
@@ -2405,6 +2666,7 @@ export class GameSystem extends createSystem({}) {
 		(d.getElementById('new-best-text') as UIKit.Text | undefined)?.setProperties({ text: this.isNewBest ? 'NEW BEST SCORE!' : '' });
 		(d.getElementById('final-perfects') as UIKit.Text | undefined)?.setProperties({ text: `${this.sessionPerfects}` });
 		(d.getElementById('final-nearmiss') as UIKit.Text | undefined)?.setProperties({ text: `${this.sessionNearMisses}` });
+		(d.getElementById('final-powerups') as UIKit.Text | undefined)?.setProperties({ text: `${this.powerUpsUsed}` });
 		// Session comparison
 		if (this.lastSession && this.lastSession.mode === this.mode) {
 			const scoreDiff = this.score - this.lastSession.score;
@@ -2673,6 +2935,17 @@ export class GameSystem extends createSystem({}) {
 			{ id: 'speed_40', name: 'Blitz', description: 'Stack 40 in Speed mode', unlocked: false },
 			{ id: 'daily_7', name: 'Weekly Warrior', description: 'Complete 7 daily challenges', unlocked: false },
 			{ id: 'total_blocks_5000', name: 'Grand Architect', description: 'Place 5000 total blocks', unlocked: false },
+			// Round 7 achievements
+			{ id: 'fever_mode', name: 'Fever Pitch', description: 'Trigger Fever Mode (8x combo)', unlocked: false },
+			{ id: 'freeze_earn', name: 'Ice Age', description: 'Earn a Freeze power-up', unlocked: false },
+			{ id: 'endless_wave_3', name: 'Wave Rider', description: 'Reach wave 3 in Endless', unlocked: false },
+			{ id: 'endless_wave_5', name: 'Tsunami', description: 'Reach wave 5 in Endless', unlocked: false },
+			{ id: 'combo_50_game', name: 'Machine', description: '50 combo in a single game', unlocked: false },
+			{ id: 'height_150', name: 'Thermosphere', description: 'Stack 150 blocks', unlocked: false },
+			{ id: 'score_25000', name: 'Olympian', description: 'Score 25,000 in one game', unlocked: false },
+			{ id: 'perfect_pct_75', name: 'Diamond Hands', description: '75%+ perfect rate (30+ blocks)', unlocked: false },
+			{ id: 'powerups_10', name: 'Power Player', description: 'Earn 10 power-ups in one game', unlocked: false },
+			{ id: 'total_perfects_1000', name: 'Eternal Precision', description: '1000 total perfect placements', unlocked: false },
 		];
 		try {
 			const s = localStorage.getItem('neon-stack-achievements');
@@ -2792,6 +3065,16 @@ export class GameSystem extends createSystem({}) {
 		// Check all modes played
 		const modesPlayed = ['mode_classic', 'mode_zen', 'mode_speed', 'mode_precision', 'mode_challenge', 'mode_endless'];
 		if (modesPlayed.every(m => this.achievements.find(a => a.id === m)?.unlocked)) this.unlock('all_modes_played');
+		// Round 7 achievements
+		if (this.maxCombo >= 50) this.unlock('combo_50_game');
+		if (this.height >= 150) this.unlock('height_150');
+		if (this.score >= 25000) this.unlock('score_25000');
+		if (this.height >= 30 && this.stats.totalBlocks > 0) {
+			const pct = this.sessionPerfects / (this.height - 1);
+			if (pct >= 0.75) this.unlock('perfect_pct_75');
+		}
+		if (this.powerUpsUsed >= 10) this.unlock('powerups_10');
+		if (this.stats.totalPerfects >= 1000) this.unlock('total_perfects_1000');
 	}
 
 	// == Leaderboards =====================================================

@@ -1,8 +1,8 @@
-<panel width="500" height="600" backgroundColor="#0a0a1aee" borderRadius="16" borderWidth="2" borderColor="#ff444444" padding="24">
-  <container flexDirection="column" alignItems="center" gap="10" width="100%">
+<panel width="500" height="640" backgroundColor="#0a0a1aee" borderRadius="16" borderWidth="2" borderColor="#ff444444" padding="24">
+  <container flexDirection="column" alignItems="center" gap="8" width="100%">
     <text fontSize="40" fontWeight="bold" color="#ff4444">GAME OVER</text>
     <text id="new-best-text" fontSize="20" fontWeight="bold" color="#ffaa00"> </text>
-    <container flexDirection="column" gap="6" alignItems="center">
+    <container flexDirection="column" gap="5" alignItems="center">
       <container flexDirection="row" gap="8" alignItems="center">
         <text fontSize="14" color="#888899">SCORE</text>
         <text id="final-score" fontSize="28" fontWeight="bold" color="#00ffff">0</text>
@@ -19,13 +19,19 @@
         <text fontSize="14" color="#888899">BEST</text>
         <text id="best-score" fontSize="20" fontWeight="bold" color="#ffaa00">0</text>
       </container>
-      <container flexDirection="row" gap="8" alignItems="center">
-        <text fontSize="12" color="#666677">PERFECTS</text>
-        <text id="final-perfects" fontSize="16" color="#88aacc">0</text>
-      </container>
-      <container flexDirection="row" gap="8" alignItems="center">
-        <text fontSize="12" color="#666677">NEAR MISSES</text>
-        <text id="final-nearmiss" fontSize="16" color="#ffdd44">0</text>
+      <container flexDirection="row" gap="12" alignItems="center">
+        <container flexDirection="column" alignItems="center" gap="1">
+          <text fontSize="10" color="#666677">PERFECTS</text>
+          <text id="final-perfects" fontSize="16" color="#88aacc">0</text>
+        </container>
+        <container flexDirection="column" alignItems="center" gap="1">
+          <text fontSize="10" color="#666677">NEAR MISSES</text>
+          <text id="final-nearmiss" fontSize="16" color="#ffdd44">0</text>
+        </container>
+        <container flexDirection="column" alignItems="center" gap="1">
+          <text fontSize="10" color="#666677">POWER-UPS</text>
+          <text id="final-powerups" fontSize="16" color="#bb88ff">0</text>
+        </container>
       </container>
     </container>
     <text id="session-compare" fontSize="13" color="#667788"> </text>

@@ -241,6 +241,18 @@
                   "color": "#bb44ff"
                 },
                 "dataUid": "uid-22"
+              },
+              {
+                "sourceTag": "text",
+                "type": "custom",
+                "children": [
+                  "15 combo = Freeze (block stops briefly)"
+                ],
+                "properties": {
+                  "fontsize": "13",
+                  "color": "#88ccff"
+                },
+                "dataUid": "uid-23"
               }
             ],
             "properties": {
@@ -265,7 +277,7 @@
                   "fontweight": "bold",
                   "color": "#00ff88"
                 },
-                "dataUid": "uid-24"
+                "dataUid": "uid-25"
               },
               {
                 "sourceTag": "text",
@@ -277,25 +289,13 @@
                   "fontsize": "13",
                   "color": "#ccccdd"
                 },
-                "dataUid": "uid-25"
-              },
-              {
-                "sourceTag": "text",
-                "type": "custom",
-                "children": [
-                  "Watch the danger warning on HUD!"
-                ],
-                "properties": {
-                  "fontsize": "13",
-                  "color": "#ccccdd"
-                },
                 "dataUid": "uid-26"
               },
               {
                 "sourceTag": "text",
                 "type": "custom",
                 "children": [
-                  "Wind picks up at higher heights!"
+                  "8+ combo triggers FEVER MODE!"
                 ],
                 "properties": {
                   "fontsize": "13",
@@ -307,13 +307,37 @@
                 "sourceTag": "text",
                 "type": "custom",
                 "children": [
-                  "Change themes in Settings!"
+                  "Wind picks up at higher heights!"
                 ],
                 "properties": {
                   "fontsize": "13",
                   "color": "#ccccdd"
                 },
                 "dataUid": "uid-28"
+              },
+              {
+                "sourceTag": "text",
+                "type": "custom",
+                "children": [
+                  "Endless mode has rising waves!"
+                ],
+                "properties": {
+                  "fontsize": "13",
+                  "color": "#ccccdd"
+                },
+                "dataUid": "uid-29"
+              },
+              {
+                "sourceTag": "text",
+                "type": "custom",
+                "children": [
+                  "Change themes in Settings!"
+                ],
+                "properties": {
+                  "fontsize": "13",
+                  "color": "#ccccdd"
+                },
+                "dataUid": "uid-30"
               }
             ],
             "properties": {
@@ -321,7 +345,7 @@
               "gap": "3",
               "width": "100%"
             },
-            "dataUid": "uid-23"
+            "dataUid": "uid-24"
           },
           {
             "sourceTag": "text",
@@ -341,13 +365,13 @@
               "bordercolor": "#ff444444",
               "width": "80%"
             },
-            "dataUid": "uid-29"
+            "dataUid": "uid-31"
           }
         ],
         "properties": {
           "flexdirection": "column",
           "alignitems": "center",
-          "gap": "10",
+          "gap": "8",
           "width": "100%"
         },
         "dataUid": "uid-2"
@@ -355,7 +379,7 @@
     ],
     "properties": {
       "width": "480",
-      "height": "600",
+      "height": "640",
       "backgroundcolor": "#0a0a1aee",
       "borderradius": "16",
       "borderwidth": "2",
@@ -372,7 +396,7 @@
         "column": 0
       },
       "end": {
-        "line": 34,
+        "line": 36,
         "column": 8
       }
     },
@@ -382,7 +406,7 @@
         "column": 2
       },
       "end": {
-        "line": 33,
+        "line": 35,
         "column": 14
       }
     },
@@ -522,7 +546,7 @@
         "column": 4
       },
       "end": {
-        "line": 24,
+        "line": 25,
         "column": 16
       }
     },
@@ -588,22 +612,22 @@
     },
     "uid-23": {
       "start": {
-        "line": 25,
-        "column": 4
+        "line": 24,
+        "column": 6
       },
       "end": {
-        "line": 31,
-        "column": 16
+        "line": 24,
+        "column": 88
       }
     },
     "uid-24": {
       "start": {
         "line": 26,
-        "column": 6
+        "column": 4
       },
       "end": {
-        "line": 26,
-        "column": 71
+        "line": 33,
+        "column": 16
       }
     },
     "uid-25": {
@@ -613,7 +637,7 @@
       },
       "end": {
         "line": 27,
-        "column": 77
+        "column": 71
       }
     },
     "uid-26": {
@@ -623,7 +647,7 @@
       },
       "end": {
         "line": 28,
-        "column": 81
+        "column": 77
       }
     },
     "uid-27": {
@@ -633,7 +657,7 @@
       },
       "end": {
         "line": 29,
-        "column": 81
+        "column": 78
       }
     },
     "uid-28": {
@@ -643,16 +667,36 @@
       },
       "end": {
         "line": 30,
-        "column": 75
+        "column": 81
       }
     },
     "uid-29": {
       "start": {
+        "line": 31,
+        "column": 6
+      },
+      "end": {
+        "line": 31,
+        "column": 79
+      }
+    },
+    "uid-30": {
+      "start": {
         "line": 32,
-        "column": 4
+        "column": 6
       },
       "end": {
         "line": 32,
+        "column": 75
+      }
+    },
+    "uid-31": {
+      "start": {
+        "line": 34,
+        "column": 4
+      },
+      "end": {
+        "line": 34,
         "column": 203
       }
     }

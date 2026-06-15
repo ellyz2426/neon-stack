@@ -176,6 +176,17 @@ interface SessionRecord {
 	mode: GameMode;
 }
 
+interface SpeedLine {
+	mesh: Mesh;
+	life: number;
+	velocity: Vector3;
+}
+
+interface NearMissFlash {
+	timer: number;
+	text: string;
+}
+
 // == Audio Engine ===========================================================
 
 class AudioEngine {
@@ -460,6 +471,7 @@ const BASE_SPEED = 2.5;
 const SPEED_INCREMENT = 0.08;
 const MAX_SPEED = 8.0;
 const PERFECT_THRESHOLD = 0.08;
+const NEAR_MISS_THRESHOLD = 0.22;
 const SLIDE_RANGE = 5.0;
 
 // == Keyboard ===============================================================
@@ -619,11 +631,36 @@ export class GameSystem extends createSystem({}) {
 
 	// Round 5: Height milestone markers
 	private milestoneMarkers: MilestoneMarker[] = [];
-	private milestoneHeights = [25, 50, 75, 100];
+	private milestoneHeights = [25, 50, 75, 100, 120];
 
 	// Round 5: Session comparison
 	private lastSession: SessionRecord | null = null;
 	private sessionPerfects = 0;
+
+	// Round 6: Wind effect
+	private windStrength = 0;
+	private windDirection = 0;
+	private windTime = 0;
+
+	// Round 6: Near-miss feedback
+	private nearMissFlash: NearMissFlash = { timer: 0, text: '' };
+
+	// Round 6: Game over tower orbit
+	private gameOverOrbitAngle = 0;
+	private gameOverOrbitActive = false;
+
+	// Round 6: Magnet power-up
+	private magnetActive = false;
+
+	// Round 6: Speed lines
+	private speedLines: SpeedLine[] = [];
+	private speedLineGroup!: Group;
+
+	// Round 6: Near-miss counter
+	private sessionNearMisses = 0;
+
+	// Round 6: Theme tracking (for all_themes achievement)
+	private themesPlayed = new Set<ColorTheme>();
 
 	bootstrap(world: World) {
 		this.w = world;
@@ -669,6 +706,8 @@ export class GameSystem extends createSystem({}) {
 		scene.add(this.scorePopupGroup);
 		this.confettiGroup = new Group();
 		scene.add(this.confettiGroup);
+		this.speedLineGroup = new Group();
+		scene.add(this.speedLineGroup);
 		this.createGrid(scene);
 		this.createStars(scene);
 		this.createAurora(scene);
@@ -936,6 +975,15 @@ export class GameSystem extends createSystem({}) {
 		this.comboAnnounceTimer = 0;
 		if (this.comboAnnounceEntity?.object3D) this.comboAnnounceEntity.object3D.visible = false;
 		if (this.powerupEntity?.object3D) this.powerupEntity.object3D.visible = false;
+		this.windStrength = 0; this.windDirection = 0; this.windTime = 0;
+		this.nearMissFlash = { timer: 0, text: '' };
+		this.gameOverOrbitActive = false; this.gameOverOrbitAngle = 0;
+		this.magnetActive = false;
+		this.sessionNearMisses = 0;
+		this.themesPlayed.add(this.colorTheme);
+		// Clear speed lines
+		for (const sl of this.speedLines) { this.speedLineGroup.remove(sl.mesh); sl.mesh.geometry.dispose(); (sl.mesh.material as MeshBasicMaterial).dispose(); }
+		this.speedLines = [];
 		if (mode === 'challenge') this.challengeTarget = 15 + Math.floor(Math.random() * 20);
 		this.clearTower();
 		this.createBaseBlock();
@@ -973,6 +1021,9 @@ export class GameSystem extends createSystem({}) {
 		this.confettiPieces = [];
 		// Clear milestone markers
 		this.clearMilestoneMarkers();
+		// Clear speed lines
+		for (const sl of this.speedLines) { this.speedLineGroup.remove(sl.mesh); sl.mesh.geometry.dispose(); (sl.mesh.material as MeshBasicMaterial).dispose(); }
+		this.speedLines = [];
 		this.destroyGhost();
 		this.comboFlashTime = 0;
 		this.shakeIntensity = 0;
@@ -1119,7 +1170,16 @@ export class GameSystem extends createSystem({}) {
 		}
 
 		const slideOff = this.slideAxis === 'z' ? offZ : offX;
-		const isPerfect = Math.abs(slideOff) < PERFECT_THRESHOLD;
+		const isPerfect = Math.abs(slideOff) < PERFECT_THRESHOLD || this.magnetActive;
+		const isNearMiss = !isPerfect && Math.abs(slideOff) < NEAR_MISS_THRESHOLD;
+
+		// Consume magnet on use
+		if (this.magnetActive && Math.abs(slideOff) >= PERFECT_THRESHOLD) {
+			this.magnetActive = false;
+			this.showPowerUpNotify('MAGNET SNAP!', '#bb44ff');
+		} else if (this.magnetActive) {
+			this.magnetActive = false;
+		}
 
 		if (isPerfect) {
 			cur.mesh.position.x = prev.x;
@@ -1199,6 +1259,12 @@ export class GameSystem extends createSystem({}) {
 			this.triggerHaptic(0.3, 60); // Light haptic for imperfect
 			this.spawnRipple(cur.mesh.position, getBlockColor(this.blocks.length), false);
 			this.spawnScorePopup(cur.mesh.position, this.multiplierTimer > 0 ? 10 : 5, false);
+			// Near-miss feedback
+			if (isNearMiss) {
+				this.nearMissFlash = { timer: 1.0, text: 'CLOSE!' };
+				this.updateNearMissHUD();
+				this.sessionNearMisses++;
+			}
 		}
 
 		if (this.combo > this.maxCombo) this.maxCombo = this.combo;
@@ -1229,6 +1295,7 @@ export class GameSystem extends createSystem({}) {
 		this.checkPowerUpEarns();
 		this.checkMilestones();
 		this.updateHUD();
+		this.updateBlockGlows();
 		if (cur.width < 0.1 || cur.depth < 0.1) { this.gameOver(); return; }
 		if (this.mode === 'challenge' && this.height >= this.challengeTarget) {
 			this.score += 100;
@@ -1518,12 +1585,20 @@ export class GameSystem extends createSystem({}) {
 		if (this.combo >= 10 && this.multiplierTimer <= 0) {
 			this.activatePowerUp('multiplier');
 		}
+		// Magnet at 12 combo
+		if (this.combo >= 12 && !this.magnetActive) {
+			this.magnetActive = true;
+			this.showPowerUpNotify('MAGNET!', '#bb44ff');
+			this.audio.playLevelUp();
+			this.unlock('magnet_earn');
+		}
 		// Reset flags when combo breaks so they can be re-earned
 	}
 
 	private setTheme(theme: ColorTheme) {
 		this.colorTheme = theme;
 		activeThemeColors = COLOR_THEMES[theme];
+		this.themesPlayed.add(theme);
 		const accent = THEME_ACCENTS[theme];
 		this.w.scene.background = new Color(accent.bg);
 		(this.w.scene.fog as FogExp2).color.set(accent.fog);
@@ -1707,7 +1782,7 @@ export class GameSystem extends createSystem({}) {
 	private spawnMilestoneMarker(h: number) {
 		const y = h * BLOCK_HEIGHT + BLOCK_HEIGHT / 2;
 		const geo = new TorusGeometry(2.5, 0.02, 8, 64);
-		const color = h >= 100 ? 0xffdd00 : h >= 75 ? 0xff4488 : h >= 50 ? 0x44ffaa : 0x44aaff;
+		const color = h >= 120 ? 0xffffff : h >= 100 ? 0xffdd00 : h >= 75 ? 0xff4488 : h >= 50 ? 0x44ffaa : 0x44aaff;
 		const mat = new MeshBasicMaterial({
 			color, transparent: true, opacity: 0.4, blending: AdditiveBlending, depthWrite: false,
 		});
@@ -1833,7 +1908,89 @@ export class GameSystem extends createSystem({}) {
 		this.setState('game_over');
 	}
 
-	// == Update ===========================================================
+	// == Speed Lines ======================================================
+
+	private spawnSpeedLine() {
+		if (this.speedLines.length >= 30) return;
+		if (Math.random() > 0.3) return;
+		const cam = this.w.camera;
+		const mat = new MeshBasicMaterial({
+			color: 0xaabbff, transparent: true, opacity: 0.25, blending: AdditiveBlending, depthWrite: false,
+		});
+		const len = 0.5 + Math.random() * 1.5;
+		const mesh = new Mesh(new BoxGeometry(0.01, len, 0.01), mat);
+		// Spawn around the camera in random positions
+		const angle = Math.random() * Math.PI * 2;
+		const dist = 2 + Math.random() * 4;
+		mesh.position.set(
+			cam.position.x + Math.cos(angle) * dist,
+			cam.position.y + (Math.random() - 0.5) * 6,
+			cam.position.z + Math.sin(angle) * dist,
+		);
+		this.speedLineGroup.add(mesh);
+		this.speedLines.push({
+			mesh, life: 0.4 + Math.random() * 0.3,
+			velocity: new Vector3(0, -8 - Math.random() * 6, 0),
+		});
+	}
+
+	private updateSpeedLines(delta: number) {
+		for (let i = this.speedLines.length - 1; i >= 0; i--) {
+			const sl = this.speedLines[i];
+			sl.life -= delta;
+			sl.mesh.position.add(sl.velocity.clone().multiplyScalar(delta));
+			(sl.mesh.material as MeshBasicMaterial).opacity = Math.max(0, sl.life / 0.4) * 0.25;
+			if (sl.life <= 0) {
+				this.speedLineGroup.remove(sl.mesh);
+				sl.mesh.geometry.dispose();
+				(sl.mesh.material as MeshBasicMaterial).dispose();
+				this.speedLines.splice(i, 1);
+			}
+		}
+	}
+
+	// == Near-miss HUD ====================================================
+
+	private updateNearMissHUD(clear = false) {
+		const d = this.getDoc(this.hudEntity);
+		if (!d) return;
+		if (clear) {
+			(d.getElementById('near-miss') as UIKit.Text | undefined)?.setProperties({ text: '' });
+		} else {
+			(d.getElementById('near-miss') as UIKit.Text | undefined)?.setProperties({ text: this.nearMissFlash.text });
+		}
+	}
+
+	// == Wind HUD =========================================================
+
+	private updateWindHUD() {
+		const d = this.getDoc(this.hudEntity);
+		if (!d) return;
+		const dir = this.windDirection;
+		const arrow = dir > 0 && dir < Math.PI ? '>>' : '<<';
+		const strength = this.windStrength > 0.6 ? 'STRONG' : 'LIGHT';
+		(d.getElementById('wind-status') as UIKit.Text | undefined)?.setProperties({
+			text: `WIND ${arrow} ${strength}`,
+		});
+	}
+
+	// == Block glow scaling ===============================================
+
+	private updateBlockGlows() {
+		// Make top blocks glow brighter, bottom blocks dimmer
+		const topIdx = this.blocks.length - 1;
+		for (let i = 0; i < this.blocks.length; i++) {
+			const dist = topIdx - i;
+			const mat = this.blocks[i].mesh.material as MeshStandardMaterial;
+			if (dist > 15) {
+				mat.emissiveIntensity = 0.1;
+			} else {
+				mat.emissiveIntensity = 0.3 - dist * 0.013;
+			}
+		}
+	}
+
+	// == Update camera ====================================================
 
 	update(delta: number, _time: number) {
 		this.placeCooldown = Math.max(0, this.placeCooldown - delta);
@@ -1874,14 +2031,28 @@ export class GameSystem extends createSystem({}) {
 			if (this.multiplierTimer > 0) {
 				this.multiplierTimer -= delta;
 			}
+			// Wind effect: increases with height, changes direction over time
+			if (this.height > 10) {
+				this.windTime += delta;
+				this.windDirection = Math.sin(this.windTime * 0.4) * Math.PI * 2;
+				this.windStrength = Math.min(1.2, (this.height - 10) * 0.03) * (0.5 + Math.sin(this.windTime * 0.7) * 0.5);
+			}
 			if (this.currentBlock) {
 				const p = this.currentBlock.mesh.position;
 				if (this.slideAxis === 'x') {
 					p.x += this.slideSpeed * this.slideDir * delta;
+					// Apply wind drift on the cross-axis
+					if (this.windStrength > 0) {
+						p.z += Math.sin(this.windDirection) * this.windStrength * delta * 0.3;
+					}
 					if (p.x > SLIDE_RANGE) { p.x = SLIDE_RANGE; this.slideDir = -1; }
 					if (p.x < -SLIDE_RANGE) { p.x = -SLIDE_RANGE; this.slideDir = 1; }
 				} else {
 					p.z += this.slideSpeed * this.slideDir * delta;
+					// Apply wind drift on the cross-axis
+					if (this.windStrength > 0) {
+						p.x += Math.cos(this.windDirection) * this.windStrength * delta * 0.3;
+					}
 					if (p.z > SLIDE_RANGE) { p.z = SLIDE_RANGE; this.slideDir = -1; }
 					if (p.z < -SLIDE_RANGE) { p.z = -SLIDE_RANGE; this.slideDir = 1; }
 				}
@@ -1984,9 +2155,26 @@ export class GameSystem extends createSystem({}) {
 		}
 
 		// Camera (game state)
-		if (this.state === 'playing' || this.state === 'paused' ||
-			this.state === 'game_over' || this.isCountingDown) {
+		if (this.state === 'playing' || this.state === 'paused' || this.isCountingDown) {
 			this.updateCamera(delta);
+		}
+
+		// Game over tower orbit
+		if (this.state === 'game_over') {
+			if (!this.gameOverOrbitActive) {
+				this.gameOverOrbitActive = true;
+				this.gameOverOrbitAngle = 0;
+			}
+			this.gameOverOrbitAngle += delta * 0.25;
+			const orbitRadius = 10;
+			const towerTopY = Math.max(5, (this.blocks.length - 1) * BLOCK_HEIGHT * 0.5 + 3);
+			const cx = Math.sin(this.gameOverOrbitAngle) * orbitRadius;
+			const cz = Math.cos(this.gameOverOrbitAngle) * orbitRadius;
+			const orbY = towerTopY + Math.sin(this.gameOverOrbitAngle * 0.3) * 2;
+			this.w.camera.position.set(cx, orbY, cz);
+			this.w.camera.lookAt(0, towerTopY - 2, 0);
+			// Keep game over panel following camera
+			if (this.gameOverEntity?.object3D) this.gameOverEntity.object3D.position.y = orbY;
 		}
 
 		if (this.starField) this.starField.rotation.y += delta * 0.005;
@@ -2080,6 +2268,28 @@ export class GameSystem extends createSystem({}) {
 				(this.currentBlock.mesh.material as MeshStandardMaterial).emissive.setHex(0xff2200);
 				(this.currentBlock.mesh.material as MeshStandardMaterial).emissiveIntensity = 0.3 + danger * 0.5;
 			}
+		}
+
+		// Speed lines effect (at higher speeds)
+		if (this.state === 'playing' && this.slideSpeed > 4.5 && this.currentBlock) {
+			this.spawnSpeedLine();
+		}
+		this.updateSpeedLines(delta);
+
+		// Near-miss flash timer
+		if (this.nearMissFlash.timer > 0) {
+			this.nearMissFlash.timer -= delta;
+			if (this.nearMissFlash.timer <= 0) {
+				this.updateNearMissHUD(true); // clear
+			}
+		}
+
+		// Wind indicator on HUD
+		if (this.state === 'playing' && this.windStrength > 0.1) {
+			this.updateWindHUD();
+		} else if (this.state === 'playing') {
+			const hd = this.getDoc(this.hudEntity);
+			if (hd) (hd.getElementById('wind-status') as UIKit.Text | undefined)?.setProperties({ text: '' });
 		}
 
 		// Pulse the current sliding block
@@ -2194,6 +2404,7 @@ export class GameSystem extends createSystem({}) {
 		(d.getElementById('best-score') as UIKit.Text | undefined)?.setProperties({ text: `${this.stats.bestScore}` });
 		(d.getElementById('new-best-text') as UIKit.Text | undefined)?.setProperties({ text: this.isNewBest ? 'NEW BEST SCORE!' : '' });
 		(d.getElementById('final-perfects') as UIKit.Text | undefined)?.setProperties({ text: `${this.sessionPerfects}` });
+		(d.getElementById('final-nearmiss') as UIKit.Text | undefined)?.setProperties({ text: `${this.sessionNearMisses}` });
 		// Session comparison
 		if (this.lastSession && this.lastSession.mode === this.mode) {
 			const scoreDiff = this.score - this.lastSession.score;
@@ -2451,6 +2662,17 @@ export class GameSystem extends createSystem({}) {
 			{ id: 'games_200', name: 'Devoted', description: 'Play 200 games', unlocked: false },
 			{ id: 'daily_3', name: 'Streak Runner', description: 'Complete 3 daily challenges', unlocked: false },
 			{ id: 'precision_15', name: 'Surgical', description: 'All perfects with 15+ blocks in Precision', unlocked: false },
+			// Round 6 achievements
+			{ id: 'magnet_earn', name: 'Magnetic', description: 'Earn a Magnet power-up', unlocked: false },
+			{ id: 'wind_survivor', name: 'Wind Walker', description: 'Stack 30+ blocks with wind active', unlocked: false },
+			{ id: 'near_miss_10', name: 'Close Calls', description: '10 near-misses in one game', unlocked: false },
+			{ id: 'score_15000', name: 'Transcendent Score', description: 'Score 15,000 in one game', unlocked: false },
+			{ id: 'height_120', name: 'Mesosphere', description: 'Stack 120 blocks', unlocked: false },
+			{ id: 'combo_40_game', name: 'Inhuman', description: '40 combo in a single game', unlocked: false },
+			{ id: 'all_themes', name: 'Fashionista', description: 'Play a game in each theme', unlocked: false },
+			{ id: 'speed_40', name: 'Blitz', description: 'Stack 40 in Speed mode', unlocked: false },
+			{ id: 'daily_7', name: 'Weekly Warrior', description: 'Complete 7 daily challenges', unlocked: false },
+			{ id: 'total_blocks_5000', name: 'Grand Architect', description: 'Place 5000 total blocks', unlocked: false },
 		];
 		try {
 			const s = localStorage.getItem('neon-stack-achievements');
@@ -2548,6 +2770,15 @@ export class GameSystem extends createSystem({}) {
 		if (this.stats.totalPerfects >= 500) this.unlock('total_perfects_500');
 		if (this.stats.gamesPlayed >= 200) this.unlock('games_200');
 		if (this.mode === 'precision' && this.height >= 15 && this.combo === this.height - 1) this.unlock('precision_15');
+		// Round 6 achievements
+		if (this.height >= 30 && this.windStrength > 0) this.unlock('wind_survivor');
+		if (this.sessionNearMisses >= 10) this.unlock('near_miss_10');
+		if (this.score >= 15000) this.unlock('score_15000');
+		if (this.height >= 120) this.unlock('height_120');
+		if (this.maxCombo >= 40) this.unlock('combo_40_game');
+		if (this.themesPlayed.size >= 4) this.unlock('all_themes');
+		if (this.mode === 'speed' && this.height >= 40) this.unlock('speed_40');
+		if (this.stats.totalBlocks >= 5000) this.unlock('total_blocks_5000');
 		// Check daily streak (count stored daily keys)
 		try {
 			let dailyCount = 0;
@@ -2556,6 +2787,7 @@ export class GameSystem extends createSystem({}) {
 				if (key && key.startsWith('neon-stack-daily-')) dailyCount++;
 			}
 			if (dailyCount >= 3) this.unlock('daily_3');
+			if (dailyCount >= 7) this.unlock('daily_7');
 		} catch { /* */ }
 		// Check all modes played
 		const modesPlayed = ['mode_classic', 'mode_zen', 'mode_speed', 'mode_precision', 'mode_challenge', 'mode_endless'];

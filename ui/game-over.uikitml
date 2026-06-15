@@ -23,6 +23,10 @@
         <text fontSize="12" color="#666677">PERFECTS</text>
         <text id="final-perfects" fontSize="16" color="#88aacc">0</text>
       </container>
+      <container flexDirection="row" gap="8" alignItems="center">
+        <text fontSize="12" color="#666677">NEAR MISSES</text>
+        <text id="final-nearmiss" fontSize="16" color="#ffdd44">0</text>
+      </container>
     </container>
     <text id="session-compare" fontSize="13" color="#667788"> </text>
     <container flexDirection="column" gap="10" width="80%">

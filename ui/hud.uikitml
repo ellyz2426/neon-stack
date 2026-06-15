@@ -1,4 +1,4 @@
-<panel width="560" height="100" backgroundColor="#0a0a1acc" borderRadius="12" borderWidth="1" borderColor="#00ffff33" padding="8">
+<panel width="560" height="120" backgroundColor="#0a0a1acc" borderRadius="12" borderWidth="1" borderColor="#00ffff33" padding="8">
   <container flexDirection="column" gap="4" width="100%">
     <container flexDirection="row" alignItems="center" justifyContent="space-between" width="100%" gap="10">
       <container flexDirection="column" alignItems="center" gap="2">
@@ -22,6 +22,10 @@
       <text id="shield-status" fontSize="10" fontWeight="bold" color="#00ccff"> </text>
       <text id="width-warn" fontSize="10" fontWeight="bold" color="#ff4444"> </text>
       <text id="powerup-status" fontSize="10" fontWeight="bold" color="#ffaa00"> </text>
+    </container>
+    <container flexDirection="row" justifyContent="center" gap="16">
+      <text id="near-miss" fontSize="12" fontWeight="bold" color="#ffdd44"> </text>
+      <text id="wind-status" fontSize="10" fontWeight="bold" color="#88aadd"> </text>
     </container>
   </container>
 </panel>

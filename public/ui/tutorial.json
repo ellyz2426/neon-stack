@@ -229,6 +229,18 @@
                   "color": "#ffdd00"
                 },
                 "dataUid": "uid-21"
+              },
+              {
+                "sourceTag": "text",
+                "type": "custom",
+                "children": [
+                  "12 combo = Magnet (auto-perfect next)"
+                ],
+                "properties": {
+                  "fontsize": "13",
+                  "color": "#bb44ff"
+                },
+                "dataUid": "uid-22"
               }
             ],
             "properties": {
@@ -253,7 +265,7 @@
                   "fontweight": "bold",
                   "color": "#00ff88"
                 },
-                "dataUid": "uid-23"
+                "dataUid": "uid-24"
               },
               {
                 "sourceTag": "text",
@@ -265,7 +277,7 @@
                   "fontsize": "13",
                   "color": "#ccccdd"
                 },
-                "dataUid": "uid-24"
+                "dataUid": "uid-25"
               },
               {
                 "sourceTag": "text",
@@ -277,7 +289,19 @@
                   "fontsize": "13",
                   "color": "#ccccdd"
                 },
-                "dataUid": "uid-25"
+                "dataUid": "uid-26"
+              },
+              {
+                "sourceTag": "text",
+                "type": "custom",
+                "children": [
+                  "Wind picks up at higher heights!"
+                ],
+                "properties": {
+                  "fontsize": "13",
+                  "color": "#ccccdd"
+                },
+                "dataUid": "uid-27"
               },
               {
                 "sourceTag": "text",
@@ -289,7 +313,7 @@
                   "fontsize": "13",
                   "color": "#ccccdd"
                 },
-                "dataUid": "uid-26"
+                "dataUid": "uid-28"
               }
             ],
             "properties": {
@@ -297,7 +321,7 @@
               "gap": "3",
               "width": "100%"
             },
-            "dataUid": "uid-22"
+            "dataUid": "uid-23"
           },
           {
             "sourceTag": "text",
@@ -317,7 +341,7 @@
               "bordercolor": "#ff444444",
               "width": "80%"
             },
-            "dataUid": "uid-27"
+            "dataUid": "uid-29"
           }
         ],
         "properties": {
@@ -348,7 +372,7 @@
         "column": 0
       },
       "end": {
-        "line": 32,
+        "line": 34,
         "column": 8
       }
     },
@@ -358,7 +382,7 @@
         "column": 2
       },
       "end": {
-        "line": 31,
+        "line": 33,
         "column": 14
       }
     },
@@ -498,7 +522,7 @@
         "column": 4
       },
       "end": {
-        "line": 23,
+        "line": 24,
         "column": 16
       }
     },
@@ -554,22 +578,22 @@
     },
     "uid-22": {
       "start": {
-        "line": 24,
-        "column": 4
+        "line": 23,
+        "column": 6
       },
       "end": {
-        "line": 29,
-        "column": 16
+        "line": 23,
+        "column": 86
       }
     },
     "uid-23": {
       "start": {
         "line": 25,
-        "column": 6
+        "column": 4
       },
       "end": {
-        "line": 25,
-        "column": 71
+        "line": 31,
+        "column": 16
       }
     },
     "uid-24": {
@@ -579,7 +603,7 @@
       },
       "end": {
         "line": 26,
-        "column": 77
+        "column": 71
       }
     },
     "uid-25": {
@@ -589,7 +613,7 @@
       },
       "end": {
         "line": 27,
-        "column": 81
+        "column": 77
       }
     },
     "uid-26": {
@@ -599,16 +623,36 @@
       },
       "end": {
         "line": 28,
-        "column": 75
+        "column": 81
       }
     },
     "uid-27": {
       "start": {
+        "line": 29,
+        "column": 6
+      },
+      "end": {
+        "line": 29,
+        "column": 81
+      }
+    },
+    "uid-28": {
+      "start": {
         "line": 30,
-        "column": 4
+        "column": 6
       },
       "end": {
         "line": 30,
+        "column": 75
+      }
+    },
+    "uid-29": {
+      "start": {
+        "line": 32,
+        "column": 4
+      },
+      "end": {
+        "line": 32,
         "column": 203
       }
     }

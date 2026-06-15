@@ -19,6 +19,7 @@
       </container>
     </container>
     <container flexDirection="row" justifyContent="center" gap="12">
+      <text id="shield-status" fontSize="10" fontWeight="bold" color="#00ccff"> </text>
       <text id="width-warn" fontSize="10" fontWeight="bold" color="#ff4444"> </text>
       <text id="powerup-status" fontSize="10" fontWeight="bold" color="#ffaa00"> </text>
     </container>

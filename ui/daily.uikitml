@@ -1,0 +1,22 @@
+<panel width="400" height="450" borderRadius="12" backgroundColor="rgba(0,5,20,0.92)" backgroundOpacity="0.92">
+  <container flexDirection="column" alignItems="center" paddingTop="20" paddingBottom="20" width="100%" gap="10">
+    <text fontSize="26" fontWeight="bold" color="#ffaa00">DAILY CHALLENGE</text>
+    <text id="daily-date" fontSize="14" color="#88aacc"></text>
+    <container height="2" width="80%" backgroundColor="#334466" marginTop="5" marginBottom="5"></container>
+    <text id="daily-goal" fontSize="18" color="#ffffff"></text>
+    <text id="daily-desc" fontSize="13" color="#88aacc"></text>
+    <container height="2" width="80%" backgroundColor="#334466" marginTop="5" marginBottom="5"></container>
+    <text fontSize="14" color="#88aacc">YOUR BEST TODAY</text>
+    <text id="daily-best" fontSize="22" fontWeight="bold" color="#00ffff">---</text>
+    <container height="2" width="80%" backgroundColor="#334466" marginTop="5" marginBottom="5"></container>
+    <text id="daily-status" fontSize="16" fontWeight="bold" color="#00ff88"></text>
+    <container flexDirection="row" gap="15" marginTop="10">
+      <container id="btn-daily-play" width="120" height="40" borderRadius="8" backgroundColor="rgba(0,255,136,0.2)" backgroundOpacity="0.2" alignItems="center" justifyContent="center" cursor="pointer" hover-backgroundOpacity="0.4">
+        <text fontSize="16" fontWeight="bold" color="#00ff88">PLAY</text>
+      </container>
+      <container id="btn-daily-back" width="120" height="40" borderRadius="8" backgroundColor="rgba(255,255,255,0.1)" backgroundOpacity="0.1" alignItems="center" justifyContent="center" cursor="pointer" hover-backgroundOpacity="0.25">
+        <text fontSize="16" color="#aabbcc">BACK</text>
+      </container>
+    </container>
+  </container>
+</panel>

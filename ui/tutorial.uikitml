@@ -18,7 +18,9 @@
     <container flexDirection="column" gap="3" width="100%">
       <text fontSize="16" fontWeight="bold" color="#ffaa00">Power-Ups</text>
       <text fontSize="13" color="#ccccdd">3 combo = Slow-Mo (block slows down)</text>
+      <text fontSize="13" color="#00ccff">5 combo = Shield (survive one miss)</text>
       <text fontSize="13" color="#ccccdd">7 combo = Width Boost (block grows)</text>
+      <text fontSize="13" color="#ffdd00">10 combo = 2X Score (8 seconds)</text>
     </container>
     <container flexDirection="column" gap="3" width="100%">
       <text fontSize="16" fontWeight="bold" color="#00ff88">Tips</text>

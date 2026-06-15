@@ -1,7 +1,7 @@
 <panel width="560" height="700" backgroundColor="#0a0a1aee" borderRadius="16" borderWidth="2" borderColor="#ff00ff44" padding="20">
   <container flexDirection="column" alignItems="center" gap="6" width="100%">
     <text fontSize="28" fontWeight="bold" color="#ff00ff">ACHIEVEMENTS</text>
-    <text id="ach-total" fontSize="14" color="#8888aa">0 / 44</text>
+    <text id="ach-total" fontSize="14" color="#8888aa">0 / 64</text>
     <container flexDirection="column" gap="3" width="100%">
       <container flexDirection="row" justifyContent="space-between" padding="3">
         <text id="ach-name-0" fontSize="13" fontWeight="bold" color="#ccccdd">???</text>
@@ -50,6 +50,22 @@
       <container flexDirection="row" justifyContent="space-between" padding="3">
         <text id="ach-name-11" fontSize="13" fontWeight="bold" color="#ccccdd">???</text>
         <text id="ach-desc-11" fontSize="12" color="#888899">Locked</text>
+      </container>
+      <container flexDirection="row" justifyContent="space-between" padding="3">
+        <text id="ach-name-12" fontSize="13" fontWeight="bold" color="#ccccdd">???</text>
+        <text id="ach-desc-12" fontSize="12" color="#888899">Locked</text>
+      </container>
+      <container flexDirection="row" justifyContent="space-between" padding="3">
+        <text id="ach-name-13" fontSize="13" fontWeight="bold" color="#ccccdd">???</text>
+        <text id="ach-desc-13" fontSize="12" color="#888899">Locked</text>
+      </container>
+      <container flexDirection="row" justifyContent="space-between" padding="3">
+        <text id="ach-name-14" fontSize="13" fontWeight="bold" color="#ccccdd">???</text>
+        <text id="ach-desc-14" fontSize="12" color="#888899">Locked</text>
+      </container>
+      <container flexDirection="row" justifyContent="space-between" padding="3">
+        <text id="ach-name-15" fontSize="13" fontWeight="bold" color="#ccccdd">???</text>
+        <text id="ach-desc-15" fontSize="12" color="#888899">Locked</text>
       </container>
     </container>
     <text id="btn-ach-back" fontSize="18" color="#ff4444" backgroundColor="#ff444422" borderRadius="8" padding="10" textAlign="center" borderWidth="1" borderColor="#ff444444" width="80%">BACK</text>

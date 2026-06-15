@@ -74,8 +74,8 @@ interface LandingAnim {
 }
 
 type GameMode = 'classic' | 'zen' | 'speed' | 'precision' | 'challenge' | 'endless';
-type GameState = 'menu' | 'mode_select' | 'playing' | 'paused' | 'game_over' | 'settings' | 'achievements' | 'tutorial' | 'stats' | 'leaderboard';
-type PowerUpType = 'slowmo' | 'widthboost';
+type GameState = 'menu' | 'mode_select' | 'playing' | 'paused' | 'game_over' | 'settings' | 'achievements' | 'tutorial' | 'stats' | 'leaderboard' | 'daily_challenge';
+type PowerUpType = 'slowmo' | 'widthboost' | 'shield' | 'multiplier';
 type ColorTheme = 'neon' | 'fire' | 'ice' | 'vapor';
 
 interface PowerUp {
@@ -124,6 +124,22 @@ interface LeaderboardEntry {
 }
 
 type Leaderboards = Record<GameMode, LeaderboardEntry[]>;
+
+interface DailyChallenge {
+	seed: number;
+	type: 'score' | 'height' | 'combo' | 'perfects';
+	target: number;
+	description: string;
+	date: string;
+}
+
+interface AuroraWave {
+	mesh: Mesh;
+	speed: number;
+	amplitude: number;
+	phase: number;
+	baseY: number;
+}
 
 // == Audio Engine ===========================================================
 
@@ -526,6 +542,35 @@ export class GameSystem extends createSystem({}) {
 	private colorTheme: ColorTheme = 'neon';
 	private gridGroup: Group | null = null;
 
+	// Shield power-up
+	private shieldActive = false;
+	private shieldMesh: Mesh | null = null;
+
+	// Score multiplier
+	private multiplierTimer = 0;
+	private multiplierDuration = 8;
+
+	// Combo announcer
+	private comboAnnounceEntity: Entity | null = null;
+	private comboAnnounceTimer = 0;
+
+	// Daily challenge
+	private dailyEntity: Entity | null = null;
+	private dailyChallenge: DailyChallenge | null = null;
+	private dailyBest: number = 0;
+	private isDailyRun = false;
+
+	// Aurora sky effect
+	private auroraGroup: Group | null = null;
+	private auroraWaves: AuroraWave[] = [];
+
+	// Screen pulse (ambient flash on perfect)
+	private screenPulseIntensity = 0;
+	private ambientLight: AmbientLight | null = null;
+
+	// Tower sway
+	private towerSwayTime = 0;
+
 	bootstrap(world: World) {
 		this.w = world;
 		this.loadTheme();
@@ -547,6 +592,7 @@ export class GameSystem extends createSystem({}) {
 
 		const amb = new AmbientLight(0x334466, 0.8);
 		scene.add(amb);
+		this.ambientLight = amb;
 		const dir = new DirectionalLight(0x8888ff, 0.6);
 		dir.position.set(5, 20, 10);
 		scene.add(dir);
@@ -567,6 +613,7 @@ export class GameSystem extends createSystem({}) {
 		scene.add(this.trailGroup);
 		this.createGrid(scene);
 		this.createStars(scene);
+		this.createAurora(scene);
 	}
 
 	private createGrid(parent: Object3D) {
@@ -601,6 +648,61 @@ export class GameSystem extends createSystem({}) {
 			color: 0xaabbff, size: 0.12, blending: AdditiveBlending, transparent: true, opacity: 0.7,
 		}));
 		parent.add(this.starField);
+	}
+
+	private createAurora(parent: Object3D) {
+		this.auroraGroup = new Group();
+		const colors = [0x00ffaa, 0x00aaff, 0xff00aa, 0xaa00ff, 0x44ffcc];
+		for (let i = 0; i < 5; i++) {
+			const width = 60;
+			const segments = 40;
+			const positions = new Float32Array((segments + 1) * 3);
+			for (let s = 0; s <= segments; s++) {
+				positions[s * 3] = (s / segments - 0.5) * width;
+				positions[s * 3 + 1] = 0;
+				positions[s * 3 + 2] = 0;
+			}
+			const geo = new BufferGeometry();
+			geo.setAttribute('position', new Float32BufferAttribute(positions, 3));
+			const mat = new PointsMaterial({
+				color: colors[i % colors.length],
+				size: 0.3,
+				blending: AdditiveBlending,
+				transparent: true,
+				opacity: 0.15,
+			});
+			const mesh = new Points(geo, mat) as unknown as Mesh;
+			const baseY = 40 + i * 6;
+			mesh.position.set(0, baseY, -30 - i * 5);
+			this.auroraGroup.add(mesh);
+			this.auroraWaves.push({
+				mesh,
+				speed: 0.3 + i * 0.12,
+				amplitude: 2 + i * 0.8,
+				phase: i * 1.2,
+				baseY,
+			});
+		}
+		parent.add(this.auroraGroup);
+	}
+
+	private updateAurora(time: number) {
+		for (const wave of this.auroraWaves) {
+			const geo = wave.mesh.geometry as BufferGeometry;
+			const pos = geo.getAttribute('position');
+			if (!pos) continue;
+			const arr = pos.array as Float32Array;
+			const segments = (arr.length / 3) - 1;
+			for (let s = 0; s <= segments; s++) {
+				const x = arr[s * 3];
+				arr[s * 3 + 1] = Math.sin(x * 0.05 + time * wave.speed + wave.phase) * wave.amplitude
+					+ Math.sin(x * 0.03 + time * wave.speed * 0.7) * wave.amplitude * 0.5;
+			}
+			pos.needsUpdate = true;
+			// Subtle opacity pulse
+			const mat = wave.mesh.material as PointsMaterial;
+			mat.opacity = 0.1 + Math.sin(time * 0.5 + wave.phase) * 0.06;
+		}
 	}
 
 	private setupPanels() {
@@ -670,6 +772,16 @@ export class GameSystem extends createSystem({}) {
 		this.powerupEntity.addComponent(PanelUI, { config: './ui/powerup.json' });
 		this.powerupEntity.addComponent(Follower, { target: cam, offsetPosition: [0, 0.35, -1.5], speed: 10 });
 		this.powerupEntity.object3D!.visible = false;
+
+		this.comboAnnounceEntity = w.createTransformEntity();
+		this.comboAnnounceEntity.addComponent(PanelUI, { config: './ui/combo-announce.json' });
+		this.comboAnnounceEntity.addComponent(Follower, { target: cam, offsetPosition: [0, 0.25, -1.8], speed: 10 });
+		this.comboAnnounceEntity.object3D!.visible = false;
+
+		this.dailyEntity = w.createTransformEntity();
+		this.dailyEntity.addComponent(PanelUI, { config: './ui/daily.json' });
+		this.dailyEntity.addComponent(Follower, { target: cam, offsetPosition: [0, 0, -2.5], speed: 6 });
+		this.dailyEntity.object3D!.visible = false;
 	}
 
 	// == State ============================================================
@@ -677,7 +789,8 @@ export class GameSystem extends createSystem({}) {
 	private setState(s: GameState) {
 		for (const e of [this.menuEntity, this.hudEntity, this.gameOverEntity, this.pauseEntity,
 			this.settingsEntity, this.achievementsEntity, this.modeSelectEntity,
-			this.tutorialEntity, this.statsEntity, this.countdownEntity, this.leaderboardEntity]) {
+			this.tutorialEntity, this.statsEntity, this.countdownEntity, this.leaderboardEntity,
+			this.dailyEntity]) {
 			if (e?.object3D) e.object3D.visible = false;
 		}
 		this.state = s;
@@ -694,6 +807,7 @@ export class GameSystem extends createSystem({}) {
 			case 'tutorial': this.showPanel(this.tutorialEntity); break;
 			case 'stats': this.showPanel(this.statsEntity); break;
 			case 'leaderboard': this.showPanel(this.leaderboardEntity); break;
+			case 'daily_challenge': this.showPanel(this.dailyEntity); break;
 		}
 	}
 
@@ -749,6 +863,10 @@ export class GameSystem extends createSystem({}) {
 		this.lastCountdownNum = -1; this.lastMilestone = 0; this.isNewBest = false;
 		this.powerUps = []; this.slowMoAwarded = false; this.widthBoostAwarded = false;
 		this.powerupNotifyTimer = 0;
+		this.shieldActive = false; this.multiplierTimer = 0;
+		this.destroyShieldVisual();
+		this.comboAnnounceTimer = 0;
+		if (this.comboAnnounceEntity?.object3D) this.comboAnnounceEntity.object3D.visible = false;
 		if (this.powerupEntity?.object3D) this.powerupEntity.object3D.visible = false;
 		if (mode === 'challenge') this.challengeTarget = 15 + Math.floor(Math.random() * 20);
 		this.clearTower();
@@ -849,6 +967,26 @@ export class GameSystem extends createSystem({}) {
 					this.spawnSlidingBlock();
 					return;
 				}
+				if (this.shieldActive) {
+					this.shieldActive = false;
+					this.destroyShieldVisual();
+					this.showPowerUpNotify('SHIELD USED!', '#00ccff');
+					this.audio.playCut();
+					cur.mesh.position.z = prev.z;
+					cur.depth = prev.depth;
+					cur.mesh.geometry.dispose();
+					cur.mesh.geometry = new BoxGeometry(cur.width, BLOCK_HEIGHT, cur.depth);
+					this.combo = 0;
+					cur.x = cur.mesh.position.x; cur.z = cur.mesh.position.z;
+					this.blocks.push(cur); this.currentBlock = null;
+					this.height = this.blocks.length; this.stats.totalBlocks++;
+					this.cameraTargetY = Math.max(5, cur.y + 3);
+					this.updateHUD(); this.destroyGhost();
+					this.triggerLandingAnim(cur.mesh);
+					this.unlock('shield_use');
+					this.slideAxis = 'x'; this.spawnSlidingBlock();
+					return;
+				}
 				this.gameOver(); return;
 			}
 		} else {
@@ -875,6 +1013,26 @@ export class GameSystem extends createSystem({}) {
 					this.spawnSlidingBlock();
 					return;
 				}
+				if (this.shieldActive) {
+					this.shieldActive = false;
+					this.destroyShieldVisual();
+					this.showPowerUpNotify('SHIELD USED!', '#00ccff');
+					this.audio.playCut();
+					cur.mesh.position.x = prev.x;
+					cur.width = prev.width;
+					cur.mesh.geometry.dispose();
+					cur.mesh.geometry = new BoxGeometry(cur.width, BLOCK_HEIGHT, cur.depth);
+					this.combo = 0;
+					cur.x = cur.mesh.position.x; cur.z = cur.mesh.position.z;
+					this.blocks.push(cur); this.currentBlock = null;
+					this.height = this.blocks.length; this.stats.totalBlocks++;
+					this.cameraTargetY = Math.max(5, cur.y + 3);
+					this.updateHUD(); this.destroyGhost();
+					this.triggerLandingAnim(cur.mesh);
+					this.unlock('shield_use');
+					this.slideAxis = 'z'; this.spawnSlidingBlock();
+					return;
+				}
 				this.gameOver(); return;
 			}
 		}
@@ -889,16 +1047,20 @@ export class GameSystem extends createSystem({}) {
 			cur.depth = prev.depth;
 			this.combo++;
 			const comboBonus = this.combo * 5;
-			this.score += 10 + comboBonus;
+			const baseScore = 10 + comboBonus;
+			this.score += this.multiplierTimer > 0 ? baseScore * 2 : baseScore;
 			this.spawnPerfectParticles(cur.mesh.position);
 			this.comboFlashTime = 0.15;
 			this.triggerShake(0.03);
+			this.screenPulseIntensity = 0.4;
 			if (this.combo >= 5 && this.mode !== 'precision') {
 				cur.width = Math.min(BASE_WIDTH, cur.width + 0.05);
 				cur.depth = Math.min(BASE_DEPTH, cur.depth + 0.05);
 			}
 			this.audio.playPlace(true, this.combo);
 			this.stats.totalPerfects++;
+			// Show combo announcer for combo >= 2
+			if (this.combo >= 2) this.showComboAnnounce(this.combo);
 			// Dynamic tower light every 5 perfects
 			if (this.combo % 5 === 0 && this.towerLights.length < 10) {
 				const tl = new PointLight(getBlockColor(this.blocks.length), 1.5, 15);
@@ -910,7 +1072,9 @@ export class GameSystem extends createSystem({}) {
 			this.combo = 0;
 			this.slowMoAwarded = false;
 			this.widthBoostAwarded = false;
-			this.score += 5;
+			this.shieldActive = false;
+			this.destroyShieldVisual();
+			this.score += this.multiplierTimer > 0 ? 10 : 5;
 			this.triggerShake(0.015);
 			if (this.slideAxis === 'z') {
 				const cMin = cur.mesh.position.z - cur.depth / 2;
@@ -1023,7 +1187,7 @@ export class GameSystem extends createSystem({}) {
 			existing.timer = existing.duration; // refresh
 			return;
 		}
-		const duration = type === 'slowmo' ? 5 : 0; // width boost is instant
+		const duration = type === 'slowmo' ? 5 : type === 'multiplier' ? 8 : 0; // shield/widthboost are instant/passive
 		const pu: PowerUp = { type, active: true, timer: duration, duration };
 		this.powerUps.push(pu);
 
@@ -1039,6 +1203,17 @@ export class GameSystem extends createSystem({}) {
 			}
 			this.showPowerUpNotify('WIDTH BOOST!', '#00ff88');
 			pu.active = false; // instant
+		} else if (type === 'shield') {
+			this.shieldActive = true;
+			this.createShieldVisual();
+			this.showPowerUpNotify('SHIELD!', '#00ccff');
+			this.unlock('shield_earn');
+			pu.active = false; // passive, not timer-based
+		} else if (type === 'multiplier') {
+			this.multiplierTimer = 8;
+			this.showPowerUpNotify('2X SCORE!', '#ffdd00');
+			this.unlock('multiplier_earn');
+			pu.active = false; // tracked separately
 		}
 		this.audio.playLevelUp();
 	}
@@ -1084,16 +1259,166 @@ export class GameSystem extends createSystem({}) {
 		if (this.powerupEntity?.object3D) this.powerupEntity.object3D.visible = true;
 	}
 
+	// == Shield Visual ====================================================
+
+	private createShieldVisual() {
+		this.destroyShieldVisual();
+		const geo = new SphereGeometry(0.6, 16, 12);
+		const mat = new MeshBasicMaterial({
+			color: 0x00ccff,
+			transparent: true,
+			opacity: 0.12,
+			blending: AdditiveBlending,
+			depthWrite: false,
+			wireframe: true,
+		});
+		this.shieldMesh = new Mesh(geo, mat);
+		this.towerGroup.add(this.shieldMesh);
+	}
+
+	private destroyShieldVisual() {
+		if (this.shieldMesh) {
+			this.towerGroup.remove(this.shieldMesh);
+			this.shieldMesh.geometry.dispose();
+			(this.shieldMesh.material as MeshBasicMaterial).dispose();
+			this.shieldMesh = null;
+		}
+	}
+
+	private updateShieldVisual() {
+		if (!this.shieldMesh || !this.currentBlock) return;
+		this.shieldMesh.position.copy(this.currentBlock.mesh.position);
+		this.shieldMesh.rotation.y += 0.02;
+		const pulse = 0.1 + Math.sin(performance.now() * 0.003) * 0.05;
+		(this.shieldMesh.material as MeshBasicMaterial).opacity = pulse;
+	}
+
+	// == Combo Announcer ==================================================
+
+	private showComboAnnounce(combo: number) {
+		const d = this.getDoc(this.comboAnnounceEntity);
+		if (!d) return;
+		const labels: Record<number, string> = {
+			2: 'DOUBLE!', 3: 'TRIPLE!', 4: 'QUAD!', 5: 'PENTA!',
+		};
+		const text = combo <= 5 ? labels[combo] || '' : `PERFECT x${combo}!`;
+		const sub = combo >= 10 ? 'UNSTOPPABLE' : combo >= 7 ? 'ON FIRE' : combo >= 5 ? 'AMAZING' : '';
+		(d.getElementById('combo-text') as UIKit.Text | undefined)?.setProperties({ text });
+		(d.getElementById('combo-sub') as UIKit.Text | undefined)?.setProperties({ text: sub });
+		if (this.comboAnnounceEntity?.object3D) {
+			this.comboAnnounceEntity.object3D.visible = true;
+			this.comboAnnounceEntity.object3D.position.set(0, Math.max(5, this.cameraCurrentY) + 0.3, -2);
+		}
+		this.comboAnnounceTimer = 1.2;
+	}
+
+	// == Daily Challenge ==================================================
+
+	private generateDailyChallenge(): DailyChallenge {
+		const today = new Date().toISOString().slice(0, 10);
+		// Simple seed from date string
+		let seed = 0;
+		for (let i = 0; i < today.length; i++) seed = ((seed << 5) - seed + today.charCodeAt(i)) | 0;
+		seed = Math.abs(seed);
+		const types: ('score' | 'height' | 'combo' | 'perfects')[] = ['score', 'height', 'combo', 'perfects'];
+		const type = types[seed % types.length];
+		let target = 0;
+		let description = '';
+		switch (type) {
+			case 'score':
+				target = 200 + (seed % 8) * 50;
+				description = `Score ${target} points in Classic mode`;
+				break;
+			case 'height':
+				target = 15 + (seed % 6) * 5;
+				description = `Stack ${target} blocks in Classic mode`;
+				break;
+			case 'combo':
+				target = 5 + (seed % 4) * 2;
+				description = `Reach a ${target}x combo in Classic mode`;
+				break;
+			case 'perfects':
+				target = 8 + (seed % 5) * 3;
+				description = `Get ${target} perfect placements in one game`;
+				break;
+		}
+		return { seed, type, target, description, date: today };
+	}
+
+	private checkDailyResult(): boolean {
+		if (!this.dailyChallenge) return false;
+		const dc = this.dailyChallenge;
+		switch (dc.type) {
+			case 'score': return this.score >= dc.target;
+			case 'height': return this.height >= dc.target;
+			case 'combo': return this.maxCombo >= dc.target;
+			case 'perfects': return this.stats.totalPerfects >= dc.target;
+		}
+	}
+
+	private getDailyMetric(): number {
+		if (!this.dailyChallenge) return 0;
+		switch (this.dailyChallenge.type) {
+			case 'score': return this.score;
+			case 'height': return this.height;
+			case 'combo': return this.maxCombo;
+			case 'perfects': return this.stats.totalPerfects;
+		}
+	}
+
+	private updateDailyPanel() {
+		const d = this.getDoc(this.dailyEntity);
+		if (!d) return;
+		if (!this.dailyChallenge) this.dailyChallenge = this.generateDailyChallenge();
+		const dc = this.dailyChallenge;
+		(d.getElementById('daily-date') as UIKit.Text | undefined)?.setProperties({ text: dc.date });
+		(d.getElementById('daily-goal') as UIKit.Text | undefined)?.setProperties({ text: dc.description });
+		(d.getElementById('daily-desc') as UIKit.Text | undefined)?.setProperties({
+			text: `${dc.type.toUpperCase()} challenge - Target: ${dc.target}`
+		});
+		// Load daily best from localStorage
+		try {
+			const stored = localStorage.getItem(`neon-stack-daily-${dc.date}`);
+			if (stored) this.dailyBest = parseInt(stored, 10);
+			else this.dailyBest = 0;
+		} catch { this.dailyBest = 0; }
+		(d.getElementById('daily-best') as UIKit.Text | undefined)?.setProperties({
+			text: this.dailyBest > 0 ? `${this.dailyBest}` : '---'
+		});
+		const completed = this.dailyBest >= dc.target;
+		(d.getElementById('daily-status') as UIKit.Text | undefined)?.setProperties({
+			text: completed ? 'COMPLETED!' : 'Not yet completed'
+		});
+	}
+
+	private saveDailyResult() {
+		if (!this.isDailyRun || !this.dailyChallenge) return;
+		const metric = this.getDailyMetric();
+		if (metric > this.dailyBest) {
+			this.dailyBest = metric;
+			try { localStorage.setItem(`neon-stack-daily-${this.dailyChallenge.date}`, `${metric}`); } catch { /* */ }
+		}
+		if (this.checkDailyResult()) this.unlock('daily_win');
+	}
+
 	private checkPowerUpEarns() {
 		// Slow-Mo at 3 combo (resets each game)
 		if (this.combo >= 3 && !this.slowMoAwarded) {
 			this.slowMoAwarded = true;
 			this.activatePowerUp('slowmo');
 		}
+		// Shield at 5 combo
+		if (this.combo >= 5 && !this.shieldActive) {
+			this.activatePowerUp('shield');
+		}
 		// Width Boost at 7 combo
 		if (this.combo >= 7 && !this.widthBoostAwarded) {
 			this.widthBoostAwarded = true;
 			this.activatePowerUp('widthboost');
+		}
+		// Score Multiplier at 10 combo
+		if (this.combo >= 10 && this.multiplierTimer <= 0) {
+			this.activatePowerUp('multiplier');
 		}
 		// Reset flags when combo breaks so they can be re-earned
 	}
@@ -1139,6 +1464,7 @@ export class GameSystem extends createSystem({}) {
 		this.audio.stopDrone();
 		this.audio.playGameOver();
 		this.destroyGhost();
+		this.destroyShieldVisual();
 		this.stats.gamesPlayed++;
 		this.stats.totalScore += this.score;
 		if (this.score > this.stats.bestScore) this.stats.bestScore = this.score;
@@ -1146,6 +1472,7 @@ export class GameSystem extends createSystem({}) {
 		if (this.maxCombo > this.stats.bestCombo) this.stats.bestCombo = this.maxCombo;
 		this.saveStats();
 		this.checkAchievements();
+		this.saveDailyResult();
 
 		// Save to leaderboard
 		this.isNewBest = this.saveLeaderboardEntry();
@@ -1191,6 +1518,10 @@ export class GameSystem extends createSystem({}) {
 		if (this.state === 'playing') {
 			this.gameTime += delta;
 			this.updatePowerUps(delta);
+			// Score multiplier timer
+			if (this.multiplierTimer > 0) {
+				this.multiplierTimer -= delta;
+			}
 			if (this.currentBlock) {
 				const p = this.currentBlock.mesh.position;
 				if (this.slideAxis === 'x') {
@@ -1206,6 +1537,8 @@ export class GameSystem extends createSystem({}) {
 				if (Math.random() < 0.4) this.spawnTrail();
 				// Update ghost
 				this.updateGhost();
+				// Update shield visual
+				if (this.shieldActive) this.updateShieldVisual();
 			}
 			if (this.mode === 'speed') {
 				this.speedTimeLeft -= delta;
@@ -1216,7 +1549,8 @@ export class GameSystem extends createSystem({}) {
 
 		// Menu camera orbit
 		if (this.state === 'menu' || this.state === 'mode_select' || this.state === 'settings' ||
-			this.state === 'achievements' || this.state === 'tutorial' || this.state === 'stats' || this.state === 'leaderboard') {
+			this.state === 'achievements' || this.state === 'tutorial' || this.state === 'stats' ||
+			this.state === 'leaderboard' || this.state === 'daily_challenge') {
 			this.menuOrbitAngle += delta * 0.15;
 			const radius = 10;
 			const x = Math.sin(this.menuOrbitAngle) * radius;
@@ -1295,6 +1629,49 @@ export class GameSystem extends createSystem({}) {
 		}
 
 		if (this.starField) this.starField.rotation.y += delta * 0.005;
+
+		// Aurora animation
+		this.updateAurora(_time);
+
+		// Tower sway effect (subtle sway increases with height)
+		if ((this.state === 'playing' || this.isCountingDown) && this.towerGroup) {
+			this.towerSwayTime += delta;
+			const swayIntensity = Math.min(0.008, (this.height - 1) * 0.0002);
+			this.towerGroup.rotation.x = Math.sin(this.towerSwayTime * 0.8) * swayIntensity;
+			this.towerGroup.rotation.z = Math.cos(this.towerSwayTime * 0.6) * swayIntensity * 0.7;
+		} else if (this.towerGroup) {
+			this.towerGroup.rotation.x *= 0.95;
+			this.towerGroup.rotation.z *= 0.95;
+		}
+
+		// Screen pulse (ambient flash on perfect)
+		if (this.screenPulseIntensity > 0) {
+			this.screenPulseIntensity -= delta * 2;
+			if (this.screenPulseIntensity < 0) this.screenPulseIntensity = 0;
+			if (this.ambientLight) {
+				this.ambientLight.intensity = 0.8 + this.screenPulseIntensity * 2;
+			}
+		} else if (this.ambientLight && this.ambientLight.intensity > 0.8) {
+			this.ambientLight.intensity = 0.8;
+		}
+
+		// Combo announce timer
+		if (this.comboAnnounceTimer > 0) {
+			this.comboAnnounceTimer -= delta;
+			if (this.comboAnnounceTimer <= 0) {
+				if (this.comboAnnounceEntity?.object3D) this.comboAnnounceEntity.object3D.visible = false;
+			}
+		}
+
+		// Multiplier HUD indicator
+		if (this.multiplierTimer > 0 && this.state === 'playing') {
+			const d = this.getDoc(this.hudEntity);
+			if (d) {
+				(d.getElementById('powerup-status') as UIKit.Text | undefined)?.setProperties({
+					text: `2X SCORE ${Math.ceil(this.multiplierTimer)}s`
+				});
+			}
+		}
 
 		// Environment progression
 		if (this.state === 'playing' || this.isCountingDown) {
@@ -1416,10 +1793,15 @@ export class GameSystem extends createSystem({}) {
 		const slowmo = this.powerUps.find(p => p.type === 'slowmo' && p.active);
 		if (slowmo) {
 			(d.getElementById('powerup-status') as UIKit.Text | undefined)?.setProperties({ text: `SLOW-MO ${Math.ceil(slowmo.timer)}s` });
+		} else if (this.multiplierTimer > 0) {
+			(d.getElementById('powerup-status') as UIKit.Text | undefined)?.setProperties({ text: `2X SCORE ${Math.ceil(this.multiplierTimer)}s` });
 		} else {
-			const comboToNext = this.combo < 3 ? `${3 - this.combo} to Slow-Mo` : this.combo < 7 ? `${7 - this.combo} to Width+` : '';
+			const comboToNext = this.combo < 3 ? `${3 - this.combo} to Slow-Mo` : this.combo < 5 ? `${5 - this.combo} to Shield` : this.combo < 7 ? `${7 - this.combo} to Width+` : this.combo < 10 ? `${10 - this.combo} to 2X` : '';
 			(d.getElementById('powerup-status') as UIKit.Text | undefined)?.setProperties({ text: comboToNext });
 		}
+
+		// Shield status
+		(d.getElementById('shield-status') as UIKit.Text | undefined)?.setProperties({ text: this.shieldActive ? 'SHIELD ACTIVE' : '' });
 	}
 
 	private updateModeInfo() {
@@ -1540,6 +1922,7 @@ export class GameSystem extends createSystem({}) {
 	private tryWirePanelHandlers() {
 		this.wire('menu', this.menuEntity, (d) => {
 			this.btn(d, 'btn-play', () => { this.audio.playMenuSelect(); this.setState('mode_select'); });
+			this.btn(d, 'btn-daily', () => { this.audio.playMenuSelect(); this.dailyChallenge = this.generateDailyChallenge(); this.updateDailyPanel(); this.setState('daily_challenge'); });
 			this.btn(d, 'btn-settings', () => { this.audio.playMenuSelect(); this.updateSettingsPanel(); this.setState('settings'); });
 			this.btn(d, 'btn-achievements', () => { this.audio.playMenuSelect(); this.updateAchievementsPanel(); this.setState('achievements'); });
 			this.btn(d, 'btn-tutorial', () => { this.audio.playMenuSelect(); this.setState('tutorial'); });
@@ -1594,6 +1977,10 @@ export class GameSystem extends createSystem({}) {
 			this.btn(d, 'btn-lb-precision', () => { this.lbViewMode = 'precision'; this.updateLeaderboardPanel(); this.audio.playMenuSelect(); });
 			this.btn(d, 'btn-lb-challenge', () => { this.lbViewMode = 'challenge'; this.updateLeaderboardPanel(); this.audio.playMenuSelect(); });
 			this.btn(d, 'btn-lb-endless', () => { this.lbViewMode = 'endless'; this.updateLeaderboardPanel(); this.audio.playMenuSelect(); });
+		});
+		this.wire('daily', this.dailyEntity, (d) => {
+			this.btn(d, 'btn-daily-play', () => { this.audio.playMenuSelect(); this.isDailyRun = true; this.startGame('classic'); });
+			this.btn(d, 'btn-daily-back', () => { this.audio.playMenuSelect(); this.setState('menu'); });
 		});
 	}
 
@@ -1668,6 +2055,15 @@ export class GameSystem extends createSystem({}) {
 			{ id: 'games_100', name: 'Centurion Player', description: 'Play 100 games', unlocked: false },
 			{ id: 'zen_50', name: 'Inner Peace', description: 'Stack 50 in Zen mode', unlocked: false },
 			{ id: 'speed_30', name: 'Lightning', description: 'Stack 30 in Speed mode', unlocked: false },
+			{ id: 'shield_earn', name: 'Force Field', description: 'Earn a Shield power-up', unlocked: false },
+			{ id: 'shield_use', name: 'Saved!', description: 'Shield absorbs a miss', unlocked: false },
+			{ id: 'multiplier_earn', name: 'Double Down', description: 'Earn a Score Multiplier', unlocked: false },
+			{ id: 'score_10000', name: 'Legendary', description: 'Score 10,000 in one game', unlocked: false },
+			{ id: 'height_80', name: 'Ionosphere', description: 'Stack 80 blocks', unlocked: false },
+			{ id: 'total_score_100000', name: 'Millionaire', description: '100,000 total points', unlocked: false },
+			{ id: 'all_modes_played', name: 'Versatile', description: 'Play all 6 game modes', unlocked: false },
+			{ id: 'daily_win', name: 'Daily Victor', description: 'Complete a daily challenge', unlocked: false },
+			{ id: 'combo_20_game', name: 'Unstoppable', description: '20 combo in a single game', unlocked: false },
 		];
 		try {
 			const s = localStorage.getItem('neon-stack-achievements');
@@ -1750,6 +2146,13 @@ export class GameSystem extends createSystem({}) {
 		if (this.stats.gamesPlayed >= 100) this.unlock('games_100');
 		if (this.mode === 'zen' && this.height >= 50) this.unlock('zen_50');
 		if (this.mode === 'speed' && this.height >= 30) this.unlock('speed_30');
+		if (this.score >= 10000) this.unlock('score_10000');
+		if (this.height >= 80) this.unlock('height_80');
+		if (this.stats.totalScore >= 100000) this.unlock('total_score_100000');
+		if (this.maxCombo >= 20) this.unlock('combo_20_game');
+		// Check all modes played
+		const modesPlayed = ['mode_classic', 'mode_zen', 'mode_speed', 'mode_precision', 'mode_challenge', 'mode_endless'];
+		if (modesPlayed.every(m => this.achievements.find(a => a.id === m)?.unlocked)) this.unlock('all_modes_played');
 	}
 
 	// == Leaderboards =====================================================

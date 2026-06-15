@@ -198,13 +198,37 @@
                 "sourceTag": "text",
                 "type": "custom",
                 "children": [
+                  "5 combo = Shield (survive one miss)"
+                ],
+                "properties": {
+                  "fontsize": "13",
+                  "color": "#00ccff"
+                },
+                "dataUid": "uid-19"
+              },
+              {
+                "sourceTag": "text",
+                "type": "custom",
+                "children": [
                   "7 combo = Width Boost (block grows)"
                 ],
                 "properties": {
                   "fontsize": "13",
                   "color": "#ccccdd"
                 },
-                "dataUid": "uid-19"
+                "dataUid": "uid-20"
+              },
+              {
+                "sourceTag": "text",
+                "type": "custom",
+                "children": [
+                  "10 combo = 2X Score (8 seconds)"
+                ],
+                "properties": {
+                  "fontsize": "13",
+                  "color": "#ffdd00"
+                },
+                "dataUid": "uid-21"
               }
             ],
             "properties": {
@@ -229,7 +253,7 @@
                   "fontweight": "bold",
                   "color": "#00ff88"
                 },
-                "dataUid": "uid-21"
+                "dataUid": "uid-23"
               },
               {
                 "sourceTag": "text",
@@ -241,7 +265,7 @@
                   "fontsize": "13",
                   "color": "#ccccdd"
                 },
-                "dataUid": "uid-22"
+                "dataUid": "uid-24"
               },
               {
                 "sourceTag": "text",
@@ -253,7 +277,7 @@
                   "fontsize": "13",
                   "color": "#ccccdd"
                 },
-                "dataUid": "uid-23"
+                "dataUid": "uid-25"
               },
               {
                 "sourceTag": "text",
@@ -265,7 +289,7 @@
                   "fontsize": "13",
                   "color": "#ccccdd"
                 },
-                "dataUid": "uid-24"
+                "dataUid": "uid-26"
               }
             ],
             "properties": {
@@ -273,7 +297,7 @@
               "gap": "3",
               "width": "100%"
             },
-            "dataUid": "uid-20"
+            "dataUid": "uid-22"
           },
           {
             "sourceTag": "text",
@@ -293,7 +317,7 @@
               "bordercolor": "#ff444444",
               "width": "80%"
             },
-            "dataUid": "uid-25"
+            "dataUid": "uid-27"
           }
         ],
         "properties": {
@@ -324,7 +348,7 @@
         "column": 0
       },
       "end": {
-        "line": 30,
+        "line": 32,
         "column": 8
       }
     },
@@ -334,7 +358,7 @@
         "column": 2
       },
       "end": {
-        "line": 29,
+        "line": 31,
         "column": 14
       }
     },
@@ -474,7 +498,7 @@
         "column": 4
       },
       "end": {
-        "line": 21,
+        "line": 23,
         "column": 16
       }
     },
@@ -510,32 +534,32 @@
     },
     "uid-20": {
       "start": {
-        "line": 22,
-        "column": 4
+        "line": 21,
+        "column": 6
       },
       "end": {
-        "line": 27,
-        "column": 16
+        "line": 21,
+        "column": 84
       }
     },
     "uid-21": {
       "start": {
-        "line": 23,
+        "line": 22,
         "column": 6
       },
       "end": {
-        "line": 23,
-        "column": 71
+        "line": 22,
+        "column": 80
       }
     },
     "uid-22": {
       "start": {
         "line": 24,
-        "column": 6
+        "column": 4
       },
       "end": {
-        "line": 24,
-        "column": 77
+        "line": 29,
+        "column": 16
       }
     },
     "uid-23": {
@@ -545,7 +569,7 @@
       },
       "end": {
         "line": 25,
-        "column": 81
+        "column": 71
       }
     },
     "uid-24": {
@@ -555,16 +579,36 @@
       },
       "end": {
         "line": 26,
-        "column": 75
+        "column": 77
       }
     },
     "uid-25": {
       "start": {
+        "line": 27,
+        "column": 6
+      },
+      "end": {
+        "line": 27,
+        "column": 81
+      }
+    },
+    "uid-26": {
+      "start": {
         "line": 28,
-        "column": 4
+        "column": 6
       },
       "end": {
         "line": 28,
+        "column": 75
+      }
+    },
+    "uid-27": {
+      "start": {
+        "line": 30,
+        "column": 4
+      },
+      "end": {
+        "line": 30,
         "column": 203
       }
     }

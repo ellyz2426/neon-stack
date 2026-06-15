@@ -4,6 +4,7 @@
     <text fontSize="16" color="#8888aa">Precision Block Stacking</text>
     <container flexDirection="column" gap="12" width="80%">
       <text id="btn-play" fontSize="22" fontWeight="bold" color="#000000" backgroundColor="#00ffff" borderRadius="8" padding="14" textAlign="center">PLAY</text>
+      <text id="btn-daily" fontSize="18" color="#ffdd00" backgroundColor="#ffdd0022" borderRadius="8" padding="12" textAlign="center" borderWidth="1" borderColor="#ffdd0044">DAILY CHALLENGE</text>
       <text id="btn-tutorial" fontSize="18" color="#44aaff" backgroundColor="#44aaff22" borderRadius="8" padding="12" textAlign="center" borderWidth="1" borderColor="#44aaff44">HOW TO PLAY</text>
       <text id="btn-leaderboard" fontSize="18" color="#ffaa00" backgroundColor="#ffaa0022" borderRadius="8" padding="12" textAlign="center" borderWidth="1" borderColor="#ffaa0044">LEADERBOARD</text>
       <text id="btn-achievements" fontSize="18" color="#ff00ff" backgroundColor="#ff00ff22" borderRadius="8" padding="12" textAlign="center" borderWidth="1" borderColor="#ff00ff44">ACHIEVEMENTS</text>

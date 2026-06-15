@@ -10,7 +10,7 @@ async function main() {
 			fov: 70,
 			near: 0.01,
 			far: 500,
-			defaultLighting: true,
+			defaultLighting: false,
 		},
 		features: {
 			grabbing: false,

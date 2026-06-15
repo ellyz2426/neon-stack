@@ -1,16 +1,20 @@
-<panel width="500" height="80" backgroundColor="#0a0a1acc" borderRadius="12" borderWidth="1" borderColor="#00ffff33" padding="8">
-  <container flexDirection="row" alignItems="center" justifyContent="space-between" width="100%" gap="16">
-    <container flexDirection="row" alignItems="center" gap="6">
-      <text fontSize="12" color="#888899">SCORE</text>
-      <text id="score" fontSize="22" fontWeight="bold" color="#00ffff">0</text>
+<panel width="520" height="90" backgroundColor="#0a0a1acc" borderRadius="12" borderWidth="1" borderColor="#00ffff33" padding="8">
+  <container flexDirection="row" alignItems="center" justifyContent="space-between" width="100%" gap="12">
+    <container flexDirection="column" alignItems="center" gap="2">
+      <text fontSize="10" color="#888899">SCORE</text>
+      <text id="score" fontSize="24" fontWeight="bold" color="#00ffff">0</text>
     </container>
-    <container flexDirection="row" alignItems="center" gap="6">
-      <text fontSize="12" color="#888899">HEIGHT</text>
-      <text id="height" fontSize="22" fontWeight="bold" color="#ff00ff">1</text>
+    <container flexDirection="column" alignItems="center" gap="2">
+      <text fontSize="10" color="#888899">HEIGHT</text>
+      <text id="height" fontSize="24" fontWeight="bold" color="#ff00ff">1</text>
     </container>
-    <container flexDirection="row" alignItems="center" gap="4">
-      <text id="combo" fontSize="20" fontWeight="bold" color="#00ff88"> </text>
-      <text id="timer" fontSize="18" color="#ffaa00"> </text>
+    <container flexDirection="column" alignItems="center" gap="2">
+      <text id="combo-label" fontSize="10" color="#888899"> </text>
+      <text id="combo" fontSize="22" fontWeight="bold" color="#00ff88"> </text>
+    </container>
+    <container flexDirection="column" alignItems="center" gap="2">
+      <text id="mode-info-label" fontSize="10" color="#888899"> </text>
+      <text id="mode-info" fontSize="20" fontWeight="bold" color="#ffaa00"> </text>
     </container>
   </container>
 </panel>

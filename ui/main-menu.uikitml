@@ -1,13 +1,14 @@
-<panel width="560" height="640" backgroundColor="#0a0a1aee" borderRadius="16" borderWidth="2" borderColor="#00ffff44" padding="32">
+<panel width="560" height="720" backgroundColor="#0a0a1aee" borderRadius="16" borderWidth="2" borderColor="#00ffff44" padding="32">
   <container flexDirection="column" alignItems="center" justifyContent="center" gap="24" width="100%">
     <text fontSize="48" fontWeight="bold" color="#00ffff">NEON STACK</text>
     <text fontSize="16" color="#8888aa">Precision Block Stacking</text>
     <container flexDirection="column" gap="12" width="80%">
       <text id="btn-play" fontSize="22" fontWeight="bold" color="#000000" backgroundColor="#00ffff" borderRadius="8" padding="14" textAlign="center">PLAY</text>
       <text id="btn-tutorial" fontSize="18" color="#44aaff" backgroundColor="#44aaff22" borderRadius="8" padding="12" textAlign="center" borderWidth="1" borderColor="#44aaff44">HOW TO PLAY</text>
+      <text id="btn-leaderboard" fontSize="18" color="#ffaa00" backgroundColor="#ffaa0022" borderRadius="8" padding="12" textAlign="center" borderWidth="1" borderColor="#ffaa0044">LEADERBOARD</text>
       <text id="btn-achievements" fontSize="18" color="#ff00ff" backgroundColor="#ff00ff22" borderRadius="8" padding="12" textAlign="center" borderWidth="1" borderColor="#ff00ff44">ACHIEVEMENTS</text>
       <text id="btn-stats" fontSize="18" color="#00ff88" backgroundColor="#00ff8822" borderRadius="8" padding="12" textAlign="center" borderWidth="1" borderColor="#00ff8844">STATISTICS</text>
-      <text id="btn-settings" fontSize="18" color="#ffaa00" backgroundColor="#ffaa0022" borderRadius="8" padding="12" textAlign="center" borderWidth="1" borderColor="#ffaa0044">SETTINGS</text>
+      <text id="btn-settings" fontSize="18" color="#aaaacc" backgroundColor="#aaaacc22" borderRadius="8" padding="12" textAlign="center" borderWidth="1" borderColor="#aaaacc44">SETTINGS</text>
     </container>
   </container>
 </panel>

@@ -96,7 +96,7 @@
                     "sourceTag": "text",
                     "type": "custom",
                     "children": [
-                      "No game over — stack forever"
+                      "No game over - stack forever"
                     ],
                     "properties": {
                       "fontsize": "11",
@@ -184,7 +184,7 @@
                     "sourceTag": "text",
                     "type": "custom",
                     "children": [
-                      "No block growth — every cut permanent"
+                      "No block growth - every cut permanent"
                     ],
                     "properties": {
                       "fontsize": "11",
@@ -272,7 +272,7 @@
                     "sourceTag": "text",
                     "type": "custom",
                     "children": [
-                      "Constant speed — pure focus"
+                      "Constant speed - pure focus"
                     ],
                     "properties": {
                       "fontsize": "11",

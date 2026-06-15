@@ -1,0 +1,9 @@
+<panel width="360" height="80" backgroundColor="#ff00ff44" borderRadius="12" borderWidth="2" borderColor="#ff00ffaa" padding="10">
+  <container flexDirection="row" alignItems="center" gap="12" width="100%">
+    <text fontSize="24" color="#ffaa00">*</text>
+    <container flexDirection="column" gap="2">
+      <text id="popup-title" fontSize="14" fontWeight="bold" color="#ffffff">Achievement Unlocked!</text>
+      <text id="popup-name" fontSize="12" color="#ff00ff">---</text>
+    </container>
+  </container>
+</panel>

@@ -8,7 +8,7 @@
       </container>
       <container flexDirection="column" gap="2">
         <text id="btn-zen" fontSize="18" fontWeight="bold" color="#00ff88" backgroundColor="#00ff8822" borderRadius="8" padding="12" textAlign="center" borderWidth="1" borderColor="#00ff8844">ZEN</text>
-        <text fontSize="11" color="#667788" textAlign="center">No game over — stack forever</text>
+        <text fontSize="11" color="#667788" textAlign="center">No game over - stack forever</text>
       </container>
       <container flexDirection="column" gap="2">
         <text id="btn-speed" fontSize="18" fontWeight="bold" color="#ff4444" backgroundColor="#ff444422" borderRadius="8" padding="12" textAlign="center" borderWidth="1" borderColor="#ff444444">SPEED</text>
@@ -16,7 +16,7 @@
       </container>
       <container flexDirection="column" gap="2">
         <text id="btn-precision" fontSize="18" fontWeight="bold" color="#ffaa00" backgroundColor="#ffaa0022" borderRadius="8" padding="12" textAlign="center" borderWidth="1" borderColor="#ffaa0044">PRECISION</text>
-        <text fontSize="11" color="#667788" textAlign="center">No block growth — every cut permanent</text>
+        <text fontSize="11" color="#667788" textAlign="center">No block growth - every cut permanent</text>
       </container>
       <container flexDirection="column" gap="2">
         <text id="btn-challenge" fontSize="18" fontWeight="bold" color="#ff00ff" backgroundColor="#ff00ff22" borderRadius="8" padding="12" textAlign="center" borderWidth="1" borderColor="#ff00ff44">CHALLENGE</text>
@@ -24,7 +24,7 @@
       </container>
       <container flexDirection="column" gap="2">
         <text id="btn-endless" fontSize="18" fontWeight="bold" color="#44aaff" backgroundColor="#44aaff22" borderRadius="8" padding="12" textAlign="center" borderWidth="1" borderColor="#44aaff44">ENDLESS</text>
-        <text fontSize="11" color="#667788" textAlign="center">Constant speed — pure focus</text>
+        <text fontSize="11" color="#667788" textAlign="center">Constant speed - pure focus</text>
       </container>
     </container>
     <text id="btn-mode-back" fontSize="18" color="#ff4444" backgroundColor="#ff444422" borderRadius="8" padding="10" textAlign="center" borderWidth="1" borderColor="#ff444444" width="80%">BACK</text>

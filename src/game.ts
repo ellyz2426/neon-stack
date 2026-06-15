@@ -24,9 +24,12 @@ import {
 	PointsMaterial,
 	Points,
 	FogExp2,
+	SphereGeometry,
+	MeshBasicMaterial,
+	CylinderGeometry,
 } from '@iwsdk/core';
 
-// ── Types ──────────────────────────────────────────────────────────────────
+// == Types ==================================================================
 
 interface Block {
 	entity: Entity;
@@ -51,8 +54,27 @@ interface Particle {
 	maxLife: number;
 }
 
+interface FloatingText {
+	mesh: Mesh;
+	velocity: Vector3;
+	life: number;
+	maxLife: number;
+}
+
+interface TrailParticle {
+	mesh: Mesh;
+	life: number;
+}
+
+interface LandingAnim {
+	mesh: Mesh;
+	time: number;
+	duration: number;
+	origScaleY: number;
+}
+
 type GameMode = 'classic' | 'zen' | 'speed' | 'precision' | 'challenge' | 'endless';
-type GameState = 'menu' | 'mode_select' | 'playing' | 'paused' | 'game_over' | 'settings' | 'achievements' | 'tutorial' | 'stats';
+type GameState = 'menu' | 'mode_select' | 'playing' | 'paused' | 'game_over' | 'settings' | 'achievements' | 'tutorial' | 'stats' | 'leaderboard';
 
 interface Achievement {
 	id: string;
@@ -71,7 +93,16 @@ interface GameStats {
 	totalScore: number;
 }
 
-// ── Audio Engine ───────────────────────────────────────────────────────────
+interface LeaderboardEntry {
+	score: number;
+	height: number;
+	combo: number;
+	date: string;
+}
+
+type Leaderboards = Record<GameMode, LeaderboardEntry[]>;
+
+// == Audio Engine ===========================================================
 
 class AudioEngine {
 	private ctx: AudioContext | null = null;
@@ -79,8 +110,9 @@ class AudioEngine {
 	volume = 0.7;
 	sfxEnabled = true;
 	musicEnabled = true;
-	private droneOsc: OscillatorNode | null = null;
-	private droneGain: GainNode | null = null;
+	private droneLayers: { osc: OscillatorNode; gain: GainNode }[] = [];
+	private droneActive = false;
+	private heightTarget = 0;
 
 	private ensure(): AudioContext {
 		if (!this.ctx) {
@@ -215,27 +247,94 @@ class AudioEngine {
 		osc.stop(t + 0.35);
 	}
 
+	/** Multi-layered evolving drone - intensity grows with height */
 	startDrone() {
 		if (!this.musicEnabled) return;
+		if (this.droneActive) return;
 		const ctx = this.ensure();
-		if (this.droneOsc) return;
-		this.droneOsc = ctx.createOscillator();
-		this.droneGain = ctx.createGain();
-		this.droneOsc.connect(this.droneGain);
-		this.droneGain.connect(this.masterGain!);
-		this.droneOsc.type = 'sine';
-		this.droneOsc.frequency.value = 55;
-		this.droneGain.gain.value = 0.08;
-		this.droneOsc.start();
+		this.droneActive = true;
+		this.heightTarget = 0;
+
+		// Layer 0: deep sub bass
+		const l0osc = ctx.createOscillator();
+		const l0gain = ctx.createGain();
+		l0osc.connect(l0gain);
+		l0gain.connect(this.masterGain!);
+		l0osc.type = 'sine';
+		l0osc.frequency.value = 55;
+		l0gain.gain.value = 0.08;
+		l0osc.start();
+		this.droneLayers.push({ osc: l0osc, gain: l0gain });
+
+		// Layer 1: mid harmonic (starts silent, fades in with height)
+		const l1osc = ctx.createOscillator();
+		const l1gain = ctx.createGain();
+		l1osc.connect(l1gain);
+		l1gain.connect(this.masterGain!);
+		l1osc.type = 'triangle';
+		l1osc.frequency.value = 110;
+		l1gain.gain.value = 0;
+		l1osc.start();
+		this.droneLayers.push({ osc: l1osc, gain: l1gain });
+
+		// Layer 2: high shimmer (starts silent, fades in at greater heights)
+		const l2osc = ctx.createOscillator();
+		const l2gain = ctx.createGain();
+		l2osc.connect(l2gain);
+		l2gain.connect(this.masterGain!);
+		l2osc.type = 'sine';
+		l2osc.frequency.value = 220;
+		l2gain.gain.value = 0;
+		l2osc.start();
+		this.droneLayers.push({ osc: l2osc, gain: l2gain });
+
+		// Layer 3: tension pad (high altitude only)
+		const l3osc = ctx.createOscillator();
+		const l3gain = ctx.createGain();
+		l3osc.connect(l3gain);
+		l3gain.connect(this.masterGain!);
+		l3osc.type = 'sawtooth';
+		l3osc.frequency.value = 165;
+		l3gain.gain.value = 0;
+		l3osc.start();
+		this.droneLayers.push({ osc: l3osc, gain: l3gain });
+	}
+
+	/** Crossfade drone layers based on tower height */
+	updateDroneHeight(height: number) {
+		if (!this.droneActive || this.droneLayers.length < 4) return;
+		const ctx = this.ensure();
+		const t = ctx.currentTime;
+		const h = Math.max(0, height - 1);
+
+		// Layer 0: always audible, slight intensity increase
+		this.droneLayers[0].gain.gain.linearRampToValueAtTime(0.08 + Math.min(h / 80, 0.04), t + 0.3);
+		// Layer 1: fades in from height 5
+		this.droneLayers[1].gain.gain.linearRampToValueAtTime(Math.min(1, Math.max(0, (h - 5) / 20)) * 0.06, t + 0.3);
+		// Layer 2: fades in from height 15
+		this.droneLayers[2].gain.gain.linearRampToValueAtTime(Math.min(1, Math.max(0, (h - 15) / 25)) * 0.05, t + 0.3);
+		// Layer 3: tension at height 30+
+		this.droneLayers[3].gain.gain.linearRampToValueAtTime(Math.min(1, Math.max(0, (h - 30) / 30)) * 0.03, t + 0.3);
+
+		// Subtle pitch drift on higher layers
+		if (h > 10) {
+			this.droneLayers[1].osc.frequency.linearRampToValueAtTime(110 + Math.sin(h * 0.1) * 3, t + 0.5);
+		}
+		if (h > 25) {
+			this.droneLayers[2].osc.frequency.linearRampToValueAtTime(220 + Math.sin(h * 0.07) * 5, t + 0.5);
+		}
 	}
 
 	stopDrone() {
-		if (this.droneOsc) {
-			this.droneOsc.stop();
-			this.droneOsc.disconnect();
-			this.droneOsc = null;
-			this.droneGain = null;
+		for (const layer of this.droneLayers) {
+			try {
+				layer.osc.stop();
+				layer.osc.disconnect();
+				layer.gain.disconnect();
+			} catch { /* already stopped */ }
 		}
+		this.droneLayers = [];
+		this.droneActive = false;
 	}
 
 	playAchievement() {
@@ -255,9 +354,27 @@ class AudioEngine {
 			osc.stop(t + i * 0.08 + 0.3);
 		});
 	}
+
+	playLevelUp() {
+		if (!this.sfxEnabled) return;
+		const ctx = this.ensure();
+		const t = ctx.currentTime;
+		[392, 494, 588, 784].forEach((freq, i) => {
+			const o = ctx.createOscillator();
+			const g = ctx.createGain();
+			o.connect(g);
+			g.connect(this.masterGain!);
+			o.frequency.value = freq;
+			o.type = 'sine';
+			g.gain.setValueAtTime(0.2, t + i * 0.05);
+			g.gain.exponentialRampToValueAtTime(0.001, t + i * 0.05 + 0.2);
+			o.start(t + i * 0.05);
+			o.stop(t + i * 0.05 + 0.25);
+		});
+	}
 }
 
-// ── Constants ──────────────────────────────────────────────────────────────
+// == Constants ==============================================================
 
 const NEON_COLORS = [
 	0x00ffff, 0xff00ff, 0x00ff88, 0xff4488, 0x44aaff,
@@ -274,7 +391,7 @@ const MAX_SPEED = 8.0;
 const PERFECT_THRESHOLD = 0.08;
 const SLIDE_RANGE = 5.0;
 
-// ── Keyboard ───────────────────────────────────────────────────────────────
+// == Keyboard ===============================================================
 
 class KeyboardState {
 	private pressed = new Set<string>();
@@ -295,7 +412,7 @@ class KeyboardState {
 	endFrame() { this.justDown.clear(); this.clicked = false; }
 }
 
-// ── Main System ────────────────────────────────────────────────────────────
+// == Main System ============================================================
 
 export class GameSystem extends createSystem({}) {
 	private state: GameState = 'menu';
@@ -314,11 +431,16 @@ export class GameSystem extends createSystem({}) {
 	private isCountingDown = false;
 	private fallingPieces: FallingPiece[] = [];
 	private particles: Particle[] = [];
+	private trailParticles: TrailParticle[] = [];
+	private landingAnims: LandingAnim[] = [];
 	private particleGroup!: Group;
 	private towerGroup!: Group;
+	private trailGroup!: Group;
 	private starField!: Points;
 	private audio = new AudioEngine();
 	private kb = new KeyboardState();
+
+	// Panel entities
 	private menuEntity: Entity | null = null;
 	private hudEntity: Entity | null = null;
 	private gameOverEntity: Entity | null = null;
@@ -329,11 +451,17 @@ export class GameSystem extends createSystem({}) {
 	private tutorialEntity: Entity | null = null;
 	private statsEntity: Entity | null = null;
 	private countdownEntity: Entity | null = null;
+	private achievementPopupEntity: Entity | null = null;
+	private leaderboardEntity: Entity | null = null;
+
 	private w!: World;
 	private achievements: Achievement[] = [];
 	private stats: GameStats = {
 		gamesPlayed: 0, totalBlocks: 0, totalPerfects: 0,
 		bestHeight: 0, bestCombo: 0, bestScore: 0, totalScore: 0,
+	};
+	private leaderboards: Leaderboards = {
+		classic: [], zen: [], speed: [], precision: [], challenge: [], endless: [],
 	};
 	private speedTimeLeft = 60;
 	private challengeTarget = 0;
@@ -341,14 +469,37 @@ export class GameSystem extends createSystem({}) {
 	private cameraCurrentY = 5;
 	private placeCooldown = 0;
 	private lastCountdownNum = -1;
-	private envHue = 0;
 	private towerLights: PointLight[] = [];
 	private comboFlashTime = 0;
+
+	// Ghost preview block
+	private ghostMesh: Mesh | null = null;
+
+	// Achievement popup
+	private achievementPopupTimer = 0;
+	private achievementQueue: string[] = [];
+
+	// Menu camera orbit
+	private menuOrbitAngle = 0;
+
+	// Leaderboard state
+	private lbViewMode: GameMode = 'classic';
+
+	// Score milestone tracking
+	private lastMilestone = 0;
+
+	// Camera shake
+	private shakeIntensity = 0;
+	private shakeTime = 0;
+
+	// New best indicator
+	private isNewBest = false;
 
 	bootstrap(world: World) {
 		this.w = world;
 		this.loadStats();
 		this.loadAchievements();
+		this.loadLeaderboards();
 		this.setupScene();
 		this.setupPanels();
 	}
@@ -357,20 +508,30 @@ export class GameSystem extends createSystem({}) {
 		const scene = this.w.scene;
 		scene.fog = new FogExp2(0x050510, 0.015);
 		scene.background = new Color(0x050510);
-		scene.add(new AmbientLight(0x334466, 0.6));
-		const dir = new DirectionalLight(0xffffff, 0.8);
+
+		// Override the default environment lighting
+		scene.environment = null;
+
+		const amb = new AmbientLight(0x334466, 0.8);
+		scene.add(amb);
+		const dir = new DirectionalLight(0x8888ff, 0.6);
 		dir.position.set(5, 20, 10);
 		scene.add(dir);
-		const p1 = new PointLight(0x00ffff, 1, 30);
+		const p1 = new PointLight(0x00ffff, 1.5, 40);
 		p1.position.set(-5, 10, 5);
 		scene.add(p1);
-		const p2 = new PointLight(0xff00ff, 0.8, 30);
+		const p2 = new PointLight(0xff00ff, 1.0, 40);
 		p2.position.set(5, 15, -5);
 		scene.add(p2);
+		const p3 = new PointLight(0x44aaff, 0.6, 30);
+		p3.position.set(0, 3, 8);
+		scene.add(p3);
 		this.towerGroup = new Group();
 		scene.add(this.towerGroup);
 		this.particleGroup = new Group();
 		scene.add(this.particleGroup);
+		this.trailGroup = new Group();
+		scene.add(this.trailGroup);
 		this.createGrid(scene);
 		this.createStars(scene);
 	}
@@ -382,26 +543,26 @@ export class GameSystem extends createSystem({}) {
 			const pos = -half + i * step;
 			const main = i % 5 === 0;
 			const c = main ? 0x00ffff : 0x112233;
-			const e = main ? 0x004455 : 0x050510;
-			const xL = new Mesh(new BoxGeometry(size, 0.005, 0.005), new MeshStandardMaterial({ color: c, emissive: e }));
+			const e = main ? 0x006688 : 0x060612;
+			const xL = new Mesh(new BoxGeometry(size, 0.008, 0.008), new MeshStandardMaterial({ color: c, emissive: e, emissiveIntensity: main ? 0.8 : 0.3 }));
 			xL.position.set(0, 0, pos); g.add(xL);
-			const zL = new Mesh(new BoxGeometry(0.005, 0.005, size), new MeshStandardMaterial({ color: c, emissive: e }));
+			const zL = new Mesh(new BoxGeometry(0.008, 0.008, size), new MeshStandardMaterial({ color: c, emissive: e, emissiveIntensity: main ? 0.8 : 0.3 }));
 			zL.position.set(pos, 0, 0); g.add(zL);
 		}
 		parent.add(g);
 	}
 
 	private createStars(parent: Object3D) {
-		const n = 500; const p = new Float32Array(n * 3);
+		const n = 800; const p = new Float32Array(n * 3);
 		for (let i = 0; i < n; i++) {
-			p[i * 3] = (Math.random() - 0.5) * 100;
-			p[i * 3 + 1] = Math.random() * 80 + 5;
-			p[i * 3 + 2] = (Math.random() - 0.5) * 100;
+			p[i * 3] = (Math.random() - 0.5) * 120;
+			p[i * 3 + 1] = Math.random() * 100 + 5;
+			p[i * 3 + 2] = (Math.random() - 0.5) * 120;
 		}
 		const geo = new BufferGeometry();
 		geo.setAttribute('position', new Float32BufferAttribute(p, 3));
 		this.starField = new Points(geo, new PointsMaterial({
-			color: 0xaabbff, size: 0.1, blending: AdditiveBlending, transparent: true, opacity: 0.6,
+			color: 0xaabbff, size: 0.12, blending: AdditiveBlending, transparent: true, opacity: 0.7,
 		}));
 		parent.add(this.starField);
 	}
@@ -458,14 +619,24 @@ export class GameSystem extends createSystem({}) {
 		this.countdownEntity.addComponent(PanelUI, { config: './ui/countdown.json' });
 		this.countdownEntity.addComponent(Follower, { target: cam, offsetPosition: [0, 0.2, -2], speed: 10 });
 		this.countdownEntity.object3D!.visible = false;
+
+		this.achievementPopupEntity = w.createTransformEntity();
+		this.achievementPopupEntity.addComponent(PanelUI, { config: './ui/achievement-popup.json' });
+		this.achievementPopupEntity.addComponent(Follower, { target: cam, offsetPosition: [0, 0.5, -1.8], speed: 10 });
+		this.achievementPopupEntity.object3D!.visible = false;
+
+		this.leaderboardEntity = w.createTransformEntity();
+		this.leaderboardEntity.addComponent(PanelUI, { config: './ui/leaderboard.json' });
+		this.leaderboardEntity.addComponent(Follower, { target: cam, offsetPosition: [0, 0, -2.5], speed: 6 });
+		this.leaderboardEntity.object3D!.visible = false;
 	}
 
-	// ── State ────────────────────────────────────────────────────────────
+	// == State ============================================================
 
 	private setState(s: GameState) {
 		for (const e of [this.menuEntity, this.hudEntity, this.gameOverEntity, this.pauseEntity,
 			this.settingsEntity, this.achievementsEntity, this.modeSelectEntity,
-			this.tutorialEntity, this.statsEntity, this.countdownEntity]) {
+			this.tutorialEntity, this.statsEntity, this.countdownEntity, this.leaderboardEntity]) {
 			if (e?.object3D) e.object3D.visible = false;
 		}
 		this.state = s;
@@ -481,6 +652,7 @@ export class GameSystem extends createSystem({}) {
 			case 'achievements': this.showPanel(this.achievementsEntity); break;
 			case 'tutorial': this.showPanel(this.tutorialEntity); break;
 			case 'stats': this.showPanel(this.statsEntity); break;
+			case 'leaderboard': this.showPanel(this.leaderboardEntity); break;
 		}
 	}
 
@@ -490,14 +662,50 @@ export class GameSystem extends createSystem({}) {
 		e.object3D.position.set(0, Math.max(5, this.cameraCurrentY), -3);
 	}
 
-	// ── Game Logic ───────────────────────────────────────────────────────
+	// == Ghost Preview ====================================================
+
+	private createGhost(width: number, depth: number) {
+		this.destroyGhost();
+		const mat = new MeshBasicMaterial({
+			color: 0xffffff, transparent: true, opacity: 0.12,
+			blending: AdditiveBlending, depthWrite: false,
+		});
+		this.ghostMesh = new Mesh(new BoxGeometry(width, BLOCK_HEIGHT, depth), mat);
+		this.towerGroup.add(this.ghostMesh);
+	}
+
+	private destroyGhost() {
+		if (this.ghostMesh) {
+			this.towerGroup.remove(this.ghostMesh);
+			this.ghostMesh.geometry.dispose();
+			(this.ghostMesh.material as MeshBasicMaterial).dispose();
+			this.ghostMesh = null;
+		}
+	}
+
+	private updateGhost() {
+		if (!this.currentBlock || !this.ghostMesh) return;
+		const prev = this.blocks[this.blocks.length - 1];
+		if (!prev) return;
+		// Ghost sits at the landing position with the current block's x/z
+		this.ghostMesh.position.set(
+			this.slideAxis === 'x' ? this.currentBlock.mesh.position.x : prev.x,
+			prev.y + BLOCK_HEIGHT,
+			this.slideAxis === 'z' ? this.currentBlock.mesh.position.z : prev.z,
+		);
+		// Pulse opacity
+		const mat = this.ghostMesh.material as MeshBasicMaterial;
+		mat.opacity = 0.08 + Math.sin(performance.now() * 0.005) * 0.04;
+	}
+
+	// == Game Logic =======================================================
 
 	private startGame(mode: GameMode) {
 		this.mode = mode;
 		this.score = 0; this.combo = 0; this.maxCombo = 0; this.height = 0;
 		this.gameTime = 0; this.slideSpeed = BASE_SPEED; this.slideAxis = 'x';
 		this.slideDir = 1; this.speedTimeLeft = 60; this.placeCooldown = 0;
-		this.lastCountdownNum = -1;
+		this.lastCountdownNum = -1; this.lastMilestone = 0; this.isNewBest = false;
 		if (mode === 'challenge') this.challengeTarget = 15 + Math.floor(Math.random() * 20);
 		this.clearTower();
 		this.createBaseBlock();
@@ -506,6 +714,7 @@ export class GameSystem extends createSystem({}) {
 		if (this.countdownEntity?.object3D) this.countdownEntity.object3D.visible = true;
 		if (this.hudEntity?.object3D) this.hudEntity.object3D.visible = true;
 		this.updateCountdownPanel();
+		this.updateModeInfo();
 		this.audio.startDrone();
 	}
 
@@ -516,9 +725,14 @@ export class GameSystem extends createSystem({}) {
 		this.fallingPieces = [];
 		for (const p of this.particles) this.particleGroup.remove(p.mesh);
 		this.particles = [];
+		for (const tp of this.trailParticles) this.trailGroup.remove(tp.mesh);
+		this.trailParticles = [];
+		this.landingAnims = [];
 		for (const tl of this.towerLights) this.towerGroup.remove(tl);
 		this.towerLights = [];
+		this.destroyGhost();
 		this.comboFlashTime = 0;
+		this.shakeIntensity = 0;
 		this.cameraTargetY = 5; this.cameraCurrentY = 5;
 	}
 
@@ -554,6 +768,9 @@ export class GameSystem extends createSystem({}) {
 		this.towerGroup.add(mesh);
 		this.currentBlock = { entity, mesh, width: prev.width, depth: prev.depth, x: mesh.position.x, z: mesh.position.z, y };
 		this.slideDir = 1;
+
+		// Create ghost preview
+		this.createGhost(prev.width, prev.depth);
 	}
 
 	private placeBlock() {
@@ -568,7 +785,6 @@ export class GameSystem extends createSystem({}) {
 			const overlap = prev.depth - Math.abs(offZ);
 			if (overlap <= 0) {
 				if (this.mode === 'zen') {
-					// Zen: no game over, reset to full size
 					cur.mesh.position.z = prev.z;
 					cur.depth = prev.depth;
 					cur.mesh.geometry.dispose();
@@ -583,6 +799,8 @@ export class GameSystem extends createSystem({}) {
 					this.stats.totalBlocks++;
 					this.cameraTargetY = Math.max(5, cur.y + 3);
 					this.updateHUD();
+					this.destroyGhost();
+					this.triggerLandingAnim(cur.mesh);
 					this.slideAxis = 'x';
 					this.spawnSlidingBlock();
 					return;
@@ -607,6 +825,8 @@ export class GameSystem extends createSystem({}) {
 					this.stats.totalBlocks++;
 					this.cameraTargetY = Math.max(5, cur.y + 3);
 					this.updateHUD();
+					this.destroyGhost();
+					this.triggerLandingAnim(cur.mesh);
 					this.slideAxis = 'z';
 					this.spawnSlidingBlock();
 					return;
@@ -624,17 +844,19 @@ export class GameSystem extends createSystem({}) {
 			cur.width = prev.width;
 			cur.depth = prev.depth;
 			this.combo++;
-			this.score += 10 + this.combo * 5;
+			const comboBonus = this.combo * 5;
+			this.score += 10 + comboBonus;
 			this.spawnPerfectParticles(cur.mesh.position);
 			this.comboFlashTime = 0.15;
+			this.triggerShake(0.03);
 			if (this.combo >= 5 && this.mode !== 'precision') {
 				cur.width = Math.min(BASE_WIDTH, cur.width + 0.05);
 				cur.depth = Math.min(BASE_DEPTH, cur.depth + 0.05);
 			}
 			this.audio.playPlace(true, this.combo);
 			this.stats.totalPerfects++;
-			// Add dynamic tower light every 5 perfects
-			if (this.combo % 5 === 0 && this.towerLights.length < 8) {
+			// Dynamic tower light every 5 perfects
+			if (this.combo % 5 === 0 && this.towerLights.length < 10) {
 				const tl = new PointLight(getBlockColor(this.blocks.length), 1.5, 15);
 				tl.position.copy(cur.mesh.position);
 				this.towerGroup.add(tl);
@@ -643,6 +865,7 @@ export class GameSystem extends createSystem({}) {
 		} else {
 			this.combo = 0;
 			this.score += 5;
+			this.triggerShake(0.015);
 			if (this.slideAxis === 'z') {
 				const cMin = cur.mesh.position.z - cur.depth / 2;
 				const cMax = cur.mesh.position.z + cur.depth / 2;
@@ -689,6 +912,21 @@ export class GameSystem extends createSystem({}) {
 		this.stats.totalBlocks++;
 		if (this.mode !== 'endless') this.slideSpeed = Math.min(MAX_SPEED, BASE_SPEED + (this.height - 1) * SPEED_INCREMENT);
 		this.cameraTargetY = Math.max(5, cur.y + 3);
+
+		// Score milestones
+		const milestones = [50, 100, 250, 500, 1000, 2000, 5000];
+		for (const m of milestones) {
+			if (this.score >= m && this.lastMilestone < m) {
+				this.lastMilestone = m;
+				this.audio.playLevelUp();
+			}
+		}
+
+		// Update drone layers based on height
+		this.audio.updateDroneHeight(this.height);
+
+		this.destroyGhost();
+		this.triggerLandingAnim(cur.mesh);
 		this.checkAchievements();
 		this.updateHUD();
 		if (cur.width < 0.1 || cur.depth < 0.1) { this.gameOver(); return; }
@@ -702,24 +940,55 @@ export class GameSystem extends createSystem({}) {
 		const mesh = new Mesh(new BoxGeometry(w, BLOCK_HEIGHT, d), mat);
 		mesh.position.set(x, y, z);
 		this.towerGroup.add(mesh);
-		this.fallingPieces.push({ mesh, velocity: new Vector3((Math.random() - 0.5), 0, (Math.random() - 0.5)), life: 2 });
+		this.fallingPieces.push({ mesh, velocity: new Vector3((Math.random() - 0.5) * 2, 0, (Math.random() - 0.5) * 2), life: 2 });
 	}
 
 	private spawnPerfectParticles(pos: Vector3) {
-		for (let i = 0; i < 20; i++) {
-			const mat = new MeshStandardMaterial({ color: 0xffffff, emissive: 0xffffff, emissiveIntensity: 1, transparent: true });
-			const mesh = new Mesh(new BoxGeometry(0.05, 0.05, 0.05), mat);
+		const count = 25 + Math.min(this.combo * 3, 25);
+		for (let i = 0; i < count; i++) {
+			const col = getBlockColor(this.blocks.length + i);
+			const mat = new MeshStandardMaterial({ color: col, emissive: col, emissiveIntensity: 1.2, transparent: true });
+			const size = 0.03 + Math.random() * 0.04;
+			const mesh = new Mesh(new BoxGeometry(size, size, size), mat);
 			mesh.position.copy(pos);
 			this.particleGroup.add(mesh);
-			const a = (i / 20) * Math.PI * 2;
-			const s = 2 + Math.random() * 3;
-			this.particles.push({ mesh, velocity: new Vector3(Math.cos(a) * s, (Math.random() - 0.3) * s, Math.sin(a) * s), life: 1, maxLife: 1 });
+			const a = (i / count) * Math.PI * 2;
+			const s = 2 + Math.random() * 4;
+			const vy = (Math.random() - 0.2) * s;
+			this.particles.push({ mesh, velocity: new Vector3(Math.cos(a) * s, vy, Math.sin(a) * s), life: 1.2, maxLife: 1.2 });
 		}
+	}
+
+	private triggerLandingAnim(mesh: Mesh) {
+		this.landingAnims.push({ mesh, time: 0, duration: 0.2, origScaleY: 1 });
+	}
+
+	private triggerShake(intensity: number) {
+		this.shakeIntensity = Math.max(this.shakeIntensity, intensity);
+		this.shakeTime = 0.15;
+	}
+
+	// == Trail Effect =====================================================
+
+	private spawnTrail() {
+		if (!this.currentBlock || this.state !== 'playing') return;
+		const pos = this.currentBlock.mesh.position;
+		const col = getBlockColor(this.blocks.length);
+		const mat = new MeshBasicMaterial({ color: col, transparent: true, opacity: 0.4, blending: AdditiveBlending });
+		const mesh = new Mesh(new SphereGeometry(0.06, 4, 4), mat);
+		mesh.position.set(
+			pos.x + (Math.random() - 0.5) * 0.3,
+			pos.y + (Math.random() - 0.5) * 0.1,
+			pos.z + (Math.random() - 0.5) * 0.3,
+		);
+		this.trailGroup.add(mesh);
+		this.trailParticles.push({ mesh, life: 0.6 });
 	}
 
 	private gameOver() {
 		this.audio.stopDrone();
 		this.audio.playGameOver();
+		this.destroyGhost();
 		this.stats.gamesPlayed++;
 		this.stats.totalScore += this.score;
 		if (this.score > this.stats.bestScore) this.stats.bestScore = this.score;
@@ -727,15 +996,31 @@ export class GameSystem extends createSystem({}) {
 		if (this.maxCombo > this.stats.bestCombo) this.stats.bestCombo = this.maxCombo;
 		this.saveStats();
 		this.checkAchievements();
+
+		// Save to leaderboard
+		this.isNewBest = this.saveLeaderboardEntry();
+
 		this.updateGameOverPanel();
 		this.setState('game_over');
 	}
 
-	// ── Update ───────────────────────────────────────────────────────────
+	// == Update ===========================================================
 
 	update(delta: number, _time: number) {
 		this.placeCooldown = Math.max(0, this.placeCooldown - delta);
 		this.tryWirePanelHandlers();
+
+		// Achievement popup timer
+		if (this.achievementPopupTimer > 0) {
+			this.achievementPopupTimer -= delta;
+			if (this.achievementPopupTimer <= 0) {
+				if (this.achievementPopupEntity?.object3D) this.achievementPopupEntity.object3D.visible = false;
+				// Check for queued achievements
+				if (this.achievementQueue.length > 0) {
+					this.showAchievementPopup(this.achievementQueue.shift()!);
+				}
+			}
+		}
 
 		if (this.isCountingDown) {
 			this.countdownTimer -= delta;
@@ -766,18 +1051,36 @@ export class GameSystem extends createSystem({}) {
 					if (p.z > SLIDE_RANGE) { p.z = SLIDE_RANGE; this.slideDir = -1; }
 					if (p.z < -SLIDE_RANGE) { p.z = -SLIDE_RANGE; this.slideDir = 1; }
 				}
+				// Trail particles
+				if (Math.random() < 0.4) this.spawnTrail();
+				// Update ghost
+				this.updateGhost();
 			}
 			if (this.mode === 'speed') {
 				this.speedTimeLeft -= delta;
+				this.updateModeInfo();
 				if (this.speedTimeLeft <= 0) this.gameOver();
 			}
 		}
 
+		// Menu camera orbit
+		if (this.state === 'menu' || this.state === 'mode_select' || this.state === 'settings' ||
+			this.state === 'achievements' || this.state === 'tutorial' || this.state === 'stats' || this.state === 'leaderboard') {
+			this.menuOrbitAngle += delta * 0.15;
+			const radius = 10;
+			const x = Math.sin(this.menuOrbitAngle) * radius;
+			const z = Math.cos(this.menuOrbitAngle) * radius;
+			this.w.camera.position.set(x, 5, z);
+			this.w.camera.lookAt(0, 3, 0);
+		}
+
+		// Falling pieces physics
 		for (let i = this.fallingPieces.length - 1; i >= 0; i--) {
 			const f = this.fallingPieces[i];
 			f.velocity.y -= 9.8 * delta;
 			f.mesh.position.add(f.velocity.clone().multiplyScalar(delta));
 			f.mesh.rotation.x += delta * 2;
+			f.mesh.rotation.z += delta * 1.5;
 			f.life -= delta;
 			(f.mesh.material as MeshStandardMaterial).opacity = Math.max(0, f.life / 2);
 			if (f.life <= 0 || f.mesh.position.y < -10) {
@@ -788,6 +1091,7 @@ export class GameSystem extends createSystem({}) {
 			}
 		}
 
+		// Particles
 		for (let i = this.particles.length - 1; i >= 0; i--) {
 			const p = this.particles[i];
 			p.velocity.y -= 5 * delta;
@@ -803,10 +1107,45 @@ export class GameSystem extends createSystem({}) {
 			}
 		}
 
-		this.updateCamera(delta);
+		// Trail particles
+		for (let i = this.trailParticles.length - 1; i >= 0; i--) {
+			const tp = this.trailParticles[i];
+			tp.life -= delta;
+			(tp.mesh.material as MeshBasicMaterial).opacity = Math.max(0, tp.life / 0.6) * 0.3;
+			tp.mesh.scale.setScalar(tp.life / 0.6);
+			if (tp.life <= 0) {
+				this.trailGroup.remove(tp.mesh);
+				tp.mesh.geometry.dispose();
+				(tp.mesh.material as MeshBasicMaterial).dispose();
+				this.trailParticles.splice(i, 1);
+			}
+		}
+
+		// Landing animations (bounce)
+		for (let i = this.landingAnims.length - 1; i >= 0; i--) {
+			const la = this.landingAnims[i];
+			la.time += delta;
+			const t = la.time / la.duration;
+			if (t >= 1) {
+				la.mesh.scale.y = la.origScaleY;
+				this.landingAnims.splice(i, 1);
+			} else {
+				// Squash and stretch bounce
+				const bounce = 1 + Math.sin(t * Math.PI) * 0.3 * (1 - t);
+				const squash = 1 - Math.sin(t * Math.PI) * 0.15 * (1 - t);
+				la.mesh.scale.set(squash, bounce, squash);
+			}
+		}
+
+		// Camera (game state)
+		if (this.state === 'playing' || this.state === 'paused' ||
+			this.state === 'game_over' || this.isCountingDown) {
+			this.updateCamera(delta);
+		}
+
 		if (this.starField) this.starField.rotation.y += delta * 0.005;
 
-		// Environment progression: shift fog/sky hue based on height
+		// Environment progression
 		if (this.state === 'playing' || this.isCountingDown) {
 			const hFactor = Math.min(1, (this.height - 1) / 60);
 			const r = Math.floor(5 + hFactor * 15);
@@ -826,7 +1165,13 @@ export class GameSystem extends createSystem({}) {
 			}
 		}
 
-		// Pulse the current sliding block for visibility
+		// Camera shake decay
+		if (this.shakeTime > 0) {
+			this.shakeTime -= delta;
+			if (this.shakeTime <= 0) this.shakeIntensity = 0;
+		}
+
+		// Pulse the current sliding block
 		if (this.currentBlock && this.state === 'playing') {
 			const pulse = 0.3 + Math.sin(_time * 8) * 0.15;
 			(this.currentBlock.mesh.material as MeshStandardMaterial).emissiveIntensity = pulse;
@@ -837,7 +1182,18 @@ export class GameSystem extends createSystem({}) {
 
 	private updateCamera(delta: number) {
 		this.cameraCurrentY += (this.cameraTargetY - this.cameraCurrentY) * delta * 3;
-		this.w.camera.position.set(0, this.cameraCurrentY, 8);
+		let camX = 0;
+		let camZ = 8;
+
+		// Apply shake
+		if (this.shakeTime > 0) {
+			const s = this.shakeIntensity * (this.shakeTime / 0.15);
+			camX += (Math.random() - 0.5) * s;
+			camZ += (Math.random() - 0.5) * s;
+			this.cameraCurrentY += (Math.random() - 0.5) * s;
+		}
+
+		this.w.camera.position.set(camX, this.cameraCurrentY, camZ);
 		this.w.camera.lookAt(0, this.cameraCurrentY - 2, 0);
 		if (this.state === 'game_over' && this.gameOverEntity?.object3D) this.gameOverEntity.object3D.position.y = this.cameraCurrentY;
 		if (this.state === 'paused' && this.pauseEntity?.object3D) this.pauseEntity.object3D.position.y = this.cameraCurrentY;
@@ -858,7 +1214,7 @@ export class GameSystem extends createSystem({}) {
 		}
 	}
 
-	// ── Panel Docs ───────────────────────────────────────────────────────
+	// == Panel Docs =======================================================
 
 	private getDoc(e: Entity | null): UIKitDocument | undefined {
 		if (!e) return undefined;
@@ -870,8 +1226,25 @@ export class GameSystem extends createSystem({}) {
 		if (!d) return;
 		(d.getElementById('score') as UIKit.Text | undefined)?.setProperties({ text: `${this.score}` });
 		(d.getElementById('combo') as UIKit.Text | undefined)?.setProperties({ text: this.combo > 0 ? `x${this.combo}` : '' });
+		(d.getElementById('combo-label') as UIKit.Text | undefined)?.setProperties({ text: this.combo > 0 ? 'COMBO' : '' });
 		(d.getElementById('height') as UIKit.Text | undefined)?.setProperties({ text: `${this.height}` });
-		if (this.mode === 'speed') (d.getElementById('timer') as UIKit.Text | undefined)?.setProperties({ text: `${Math.ceil(this.speedTimeLeft)}s` });
+	}
+
+	private updateModeInfo() {
+		const d = this.getDoc(this.hudEntity);
+		if (!d) return;
+		if (this.mode === 'speed') {
+			const t = Math.ceil(this.speedTimeLeft);
+			const color = t <= 10 ? '#ff4444' : '#ffaa00';
+			(d.getElementById('mode-info-label') as UIKit.Text | undefined)?.setProperties({ text: 'TIME' });
+			(d.getElementById('mode-info') as UIKit.Text | undefined)?.setProperties({ text: `${t}s`, color });
+		} else if (this.mode === 'challenge') {
+			(d.getElementById('mode-info-label') as UIKit.Text | undefined)?.setProperties({ text: 'TARGET' });
+			(d.getElementById('mode-info') as UIKit.Text | undefined)?.setProperties({ text: `${this.height}/${this.challengeTarget}` });
+		} else {
+			(d.getElementById('mode-info-label') as UIKit.Text | undefined)?.setProperties({ text: '' });
+			(d.getElementById('mode-info') as UIKit.Text | undefined)?.setProperties({ text: '' });
+		}
 	}
 
 	private updateGameOverPanel() {
@@ -933,7 +1306,39 @@ export class GameSystem extends createSystem({}) {
 		s('stat-perfect-pct', `${pct}%`);
 	}
 
-	// ── Panel Wiring ─────────────────────────────────────────────────────
+	private showAchievementPopup(name: string) {
+		const d = this.getDoc(this.achievementPopupEntity);
+		if (!d) return;
+		(d.getElementById('popup-name') as UIKit.Text | undefined)?.setProperties({ text: name });
+		if (this.achievementPopupEntity?.object3D) {
+			this.achievementPopupEntity.object3D.visible = true;
+			this.achievementPopupEntity.object3D.position.set(0, Math.max(5, this.cameraCurrentY) + 0.5, -2);
+		}
+		this.achievementPopupTimer = 2.5;
+	}
+
+	private updateLeaderboardPanel() {
+		const d = this.getDoc(this.leaderboardEntity);
+		if (!d) return;
+		const modeNames: Record<GameMode, string> = {
+			classic: 'Classic', zen: 'Zen', speed: 'Speed',
+			precision: 'Precision', challenge: 'Challenge', endless: 'Endless',
+		};
+		(d.getElementById('lb-mode') as UIKit.Text | undefined)?.setProperties({ text: modeNames[this.lbViewMode] });
+		const entries = this.leaderboards[this.lbViewMode];
+		for (let i = 0; i < 5; i++) {
+			const entry = entries[i];
+			if (entry) {
+				(d.getElementById(`lb-score-${i}`) as UIKit.Text | undefined)?.setProperties({ text: `${entry.score}` });
+				(d.getElementById(`lb-height-${i}`) as UIKit.Text | undefined)?.setProperties({ text: `H:${entry.height} C:${entry.combo}` });
+			} else {
+				(d.getElementById(`lb-score-${i}`) as UIKit.Text | undefined)?.setProperties({ text: '---' });
+				(d.getElementById(`lb-height-${i}`) as UIKit.Text | undefined)?.setProperties({ text: '---' });
+			}
+		}
+	}
+
+	// == Panel Wiring =====================================================
 
 	private wired = new Set<string>();
 	private tryWirePanelHandlers() {
@@ -943,6 +1348,7 @@ export class GameSystem extends createSystem({}) {
 			this.btn(d, 'btn-achievements', () => { this.audio.playMenuSelect(); this.updateAchievementsPanel(); this.setState('achievements'); });
 			this.btn(d, 'btn-tutorial', () => { this.audio.playMenuSelect(); this.setState('tutorial'); });
 			this.btn(d, 'btn-stats', () => { this.audio.playMenuSelect(); this.updateStatsPanel(); this.setState('stats'); });
+			this.btn(d, 'btn-leaderboard', () => { this.audio.playMenuSelect(); this.lbViewMode = 'classic'; this.updateLeaderboardPanel(); this.setState('leaderboard'); });
 		});
 		this.wire('modes', this.modeSelectEntity, (d) => {
 			this.btn(d, 'btn-classic', () => { this.audio.playMenuSelect(); this.startGame('classic'); });
@@ -971,6 +1377,15 @@ export class GameSystem extends createSystem({}) {
 		this.wire('ach', this.achievementsEntity, (d) => { this.btn(d, 'btn-ach-back', () => { this.audio.playMenuSelect(); this.setState('menu'); }); });
 		this.wire('tut', this.tutorialEntity, (d) => { this.btn(d, 'btn-tutorial-back', () => { this.audio.playMenuSelect(); this.setState('menu'); }); });
 		this.wire('stats', this.statsEntity, (d) => { this.btn(d, 'btn-stats-back', () => { this.audio.playMenuSelect(); this.setState('menu'); }); });
+		this.wire('lb', this.leaderboardEntity, (d) => {
+			this.btn(d, 'btn-lb-back', () => { this.audio.playMenuSelect(); this.setState('menu'); });
+			this.btn(d, 'btn-lb-classic', () => { this.lbViewMode = 'classic'; this.updateLeaderboardPanel(); this.audio.playMenuSelect(); });
+			this.btn(d, 'btn-lb-zen', () => { this.lbViewMode = 'zen'; this.updateLeaderboardPanel(); this.audio.playMenuSelect(); });
+			this.btn(d, 'btn-lb-speed', () => { this.lbViewMode = 'speed'; this.updateLeaderboardPanel(); this.audio.playMenuSelect(); });
+			this.btn(d, 'btn-lb-precision', () => { this.lbViewMode = 'precision'; this.updateLeaderboardPanel(); this.audio.playMenuSelect(); });
+			this.btn(d, 'btn-lb-challenge', () => { this.lbViewMode = 'challenge'; this.updateLeaderboardPanel(); this.audio.playMenuSelect(); });
+			this.btn(d, 'btn-lb-endless', () => { this.lbViewMode = 'endless'; this.updateLeaderboardPanel(); this.audio.playMenuSelect(); });
+		});
 	}
 
 	private wire(key: string, e: Entity | null, setup: (d: UIKitDocument) => void) {
@@ -986,7 +1401,7 @@ export class GameSystem extends createSystem({}) {
 		if (el) (el as any).addEventListener('click', h);
 	}
 
-	// ── Achievements ─────────────────────────────────────────────────────
+	// == Achievements =====================================================
 
 	private loadAchievements() {
 		this.achievements = [
@@ -1047,7 +1462,17 @@ export class GameSystem extends createSystem({}) {
 
 	private unlock(id: string) {
 		const a = this.achievements.find((x) => x.id === id);
-		if (a && !a.unlocked) { a.unlocked = true; this.audio.playAchievement(); this.saveAchievements(); }
+		if (a && !a.unlocked) {
+			a.unlocked = true;
+			this.audio.playAchievement();
+			this.saveAchievements();
+			// Queue achievement popup
+			if (this.achievementPopupTimer > 0) {
+				this.achievementQueue.push(a.name);
+			} else {
+				this.showAchievementPopup(a.name);
+			}
+		}
 	}
 
 	private checkAchievements() {
@@ -1098,7 +1523,36 @@ export class GameSystem extends createSystem({}) {
 		if (this.height >= 20 && this.stats.totalBlocks > 0 && this.stats.totalPerfects / this.stats.totalBlocks >= 0.5) this.unlock('perfect_pct_50');
 	}
 
-	// ── Persistence ──────────────────────────────────────────────────────
+	// == Leaderboards =====================================================
+
+	private loadLeaderboards() {
+		try {
+			const s = localStorage.getItem('neon-stack-leaderboards');
+			if (s) this.leaderboards = JSON.parse(s);
+		} catch { /* ignore */ }
+	}
+
+	private saveLeaderboards() {
+		try { localStorage.setItem('neon-stack-leaderboards', JSON.stringify(this.leaderboards)); } catch { /* */ }
+	}
+
+	/** Save entry and return true if it's a new #1 */
+	private saveLeaderboardEntry(): boolean {
+		const entry: LeaderboardEntry = {
+			score: this.score,
+			height: this.height,
+			combo: this.maxCombo,
+			date: new Date().toISOString().slice(0, 10),
+		};
+		const lb = this.leaderboards[this.mode];
+		lb.push(entry);
+		lb.sort((a, b) => b.score - a.score);
+		if (lb.length > 5) lb.length = 5;
+		this.saveLeaderboards();
+		return lb[0] === entry;
+	}
+
+	// == Persistence ======================================================
 
 	private loadStats() { try { const s = localStorage.getItem('neon-stack-stats'); if (s) this.stats = JSON.parse(s); } catch { /* */ } }
 	private saveStats() { try { localStorage.setItem('neon-stack-stats', JSON.stringify(this.stats)); } catch { /* */ } }

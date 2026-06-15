@@ -1,0 +1,42 @@
+<panel width="520" height="620" backgroundColor="#0a0a1aee" borderRadius="16" borderWidth="2" borderColor="#ffaa0044" padding="24">
+  <container flexDirection="column" alignItems="center" gap="8" width="100%">
+    <text fontSize="28" fontWeight="bold" color="#ffaa00">LEADERBOARD</text>
+    <text id="lb-mode" fontSize="14" color="#8888aa">Classic</text>
+    <container flexDirection="row" gap="8" width="90%">
+      <text id="btn-lb-classic" fontSize="12" fontWeight="bold" color="#00ffff" backgroundColor="#00ffff22" borderRadius="6" padding="6" textAlign="center">CLS</text>
+      <text id="btn-lb-zen" fontSize="12" fontWeight="bold" color="#00ff88" backgroundColor="#00ff8822" borderRadius="6" padding="6" textAlign="center">ZEN</text>
+      <text id="btn-lb-speed" fontSize="12" fontWeight="bold" color="#ff4444" backgroundColor="#ff444422" borderRadius="6" padding="6" textAlign="center">SPD</text>
+      <text id="btn-lb-precision" fontSize="12" fontWeight="bold" color="#ffaa00" backgroundColor="#ffaa0022" borderRadius="6" padding="6" textAlign="center">PRC</text>
+      <text id="btn-lb-challenge" fontSize="12" fontWeight="bold" color="#ff00ff" backgroundColor="#ff00ff22" borderRadius="6" padding="6" textAlign="center">CHL</text>
+      <text id="btn-lb-endless" fontSize="12" fontWeight="bold" color="#44aaff" backgroundColor="#44aaff22" borderRadius="6" padding="6" textAlign="center">END</text>
+    </container>
+    <container flexDirection="column" gap="4" width="100%">
+      <container flexDirection="row" justifyContent="space-between" padding="6" backgroundColor="#ffffff08" borderRadius="4">
+        <text fontSize="14" fontWeight="bold" color="#ffaa00">1.</text>
+        <text id="lb-score-0" fontSize="14" fontWeight="bold" color="#ccccdd">---</text>
+        <text id="lb-height-0" fontSize="12" color="#888899">---</text>
+      </container>
+      <container flexDirection="row" justifyContent="space-between" padding="6" backgroundColor="#ffffff05" borderRadius="4">
+        <text fontSize="14" fontWeight="bold" color="#c0c0c0">2.</text>
+        <text id="lb-score-1" fontSize="14" fontWeight="bold" color="#ccccdd">---</text>
+        <text id="lb-height-1" fontSize="12" color="#888899">---</text>
+      </container>
+      <container flexDirection="row" justifyContent="space-between" padding="6" backgroundColor="#ffffff08" borderRadius="4">
+        <text fontSize="14" fontWeight="bold" color="#cd7f32">3.</text>
+        <text id="lb-score-2" fontSize="14" fontWeight="bold" color="#ccccdd">---</text>
+        <text id="lb-height-2" fontSize="12" color="#888899">---</text>
+      </container>
+      <container flexDirection="row" justifyContent="space-between" padding="6" backgroundColor="#ffffff05" borderRadius="4">
+        <text fontSize="14" color="#888899">4.</text>
+        <text id="lb-score-3" fontSize="14" color="#ccccdd">---</text>
+        <text id="lb-height-3" fontSize="12" color="#888899">---</text>
+      </container>
+      <container flexDirection="row" justifyContent="space-between" padding="6" backgroundColor="#ffffff08" borderRadius="4">
+        <text fontSize="14" color="#888899">5.</text>
+        <text id="lb-score-4" fontSize="14" color="#ccccdd">---</text>
+        <text id="lb-height-4" fontSize="12" color="#888899">---</text>
+      </container>
+    </container>
+    <text id="btn-lb-back" fontSize="18" color="#ff4444" backgroundColor="#ff444422" borderRadius="8" padding="10" textAlign="center" borderWidth="1" borderColor="#ff444444" width="80%">BACK</text>
+  </container>
+</panel>

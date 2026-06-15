@@ -77,6 +77,25 @@
                 "sourceTag": "text",
                 "type": "custom",
                 "children": [
+                  "LEADERBOARD"
+                ],
+                "properties": {
+                  "id": "btn-leaderboard",
+                  "fontsize": "18",
+                  "color": "#ffaa00",
+                  "backgroundcolor": "#ffaa0022",
+                  "borderradius": "8",
+                  "padding": "12",
+                  "textalign": "center",
+                  "borderwidth": "1",
+                  "bordercolor": "#ffaa0044"
+                },
+                "dataUid": "uid-8"
+              },
+              {
+                "sourceTag": "text",
+                "type": "custom",
+                "children": [
                   "ACHIEVEMENTS"
                 ],
                 "properties": {
@@ -90,7 +109,7 @@
                   "borderwidth": "1",
                   "bordercolor": "#ff00ff44"
                 },
-                "dataUid": "uid-8"
+                "dataUid": "uid-9"
               },
               {
                 "sourceTag": "text",
@@ -109,7 +128,7 @@
                   "borderwidth": "1",
                   "bordercolor": "#00ff8844"
                 },
-                "dataUid": "uid-9"
+                "dataUid": "uid-10"
               },
               {
                 "sourceTag": "text",
@@ -120,15 +139,15 @@
                 "properties": {
                   "id": "btn-settings",
                   "fontsize": "18",
-                  "color": "#ffaa00",
-                  "backgroundcolor": "#ffaa0022",
+                  "color": "#aaaacc",
+                  "backgroundcolor": "#aaaacc22",
                   "borderradius": "8",
                   "padding": "12",
                   "textalign": "center",
                   "borderwidth": "1",
-                  "bordercolor": "#ffaa0044"
+                  "bordercolor": "#aaaacc44"
                 },
-                "dataUid": "uid-10"
+                "dataUid": "uid-11"
               }
             ],
             "properties": {
@@ -151,7 +170,7 @@
     ],
     "properties": {
       "width": "560",
-      "height": "640",
+      "height": "720",
       "backgroundcolor": "#0a0a1aee",
       "borderradius": "16",
       "borderwidth": "2",
@@ -168,7 +187,7 @@
         "column": 0
       },
       "end": {
-        "line": 12,
+        "line": 13,
         "column": 8
       }
     },
@@ -178,7 +197,7 @@
         "column": 2
       },
       "end": {
-        "line": 11,
+        "line": 12,
         "column": 14
       }
     },
@@ -208,7 +227,7 @@
         "column": 4
       },
       "end": {
-        "line": 10,
+        "line": 11,
         "column": 16
       }
     },
@@ -239,7 +258,7 @@
       },
       "end": {
         "line": 7,
-        "column": 200
+        "column": 198
       }
     },
     "uid-9": {
@@ -249,7 +268,7 @@
       },
       "end": {
         "line": 8,
-        "column": 191
+        "column": 200
       }
     },
     "uid-10": {
@@ -259,6 +278,16 @@
       },
       "end": {
         "line": 9,
+        "column": 191
+      }
+    },
+    "uid-11": {
+      "start": {
+        "line": 10,
+        "column": 6
+      },
+      "end": {
+        "line": 10,
         "column": 192
       }
     }

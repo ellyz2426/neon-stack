@@ -27,6 +27,9 @@ import {
 	SphereGeometry,
 	MeshBasicMaterial,
 	CylinderGeometry,
+	RingGeometry,
+	DoubleSide,
+	TorusGeometry,
 } from '@iwsdk/core';
 
 // == Types ==================================================================
@@ -139,6 +142,38 @@ interface AuroraWave {
 	amplitude: number;
 	phase: number;
 	baseY: number;
+}
+
+interface RippleRing {
+	mesh: Mesh;
+	life: number;
+	maxLife: number;
+	maxScale: number;
+}
+
+interface ScorePopup {
+	mesh: Mesh;
+	life: number;
+	velocity: Vector3;
+}
+
+interface ConfettiPiece {
+	mesh: Mesh;
+	velocity: Vector3;
+	rotSpeed: Vector3;
+	life: number;
+}
+
+interface MilestoneMarker {
+	ring: Mesh;
+	height: number;
+}
+
+interface SessionRecord {
+	score: number;
+	height: number;
+	combo: number;
+	mode: GameMode;
 }
 
 // == Audio Engine ===========================================================
@@ -571,6 +606,25 @@ export class GameSystem extends createSystem({}) {
 	// Tower sway
 	private towerSwayTime = 0;
 
+	// Round 5: Ripple rings on block placement
+	private rippleRings: RippleRing[] = [];
+
+	// Round 5: Floating score popups
+	private scorePopups: ScorePopup[] = [];
+	private scorePopupGroup!: Group;
+
+	// Round 5: Confetti system
+	private confettiPieces: ConfettiPiece[] = [];
+	private confettiGroup!: Group;
+
+	// Round 5: Height milestone markers
+	private milestoneMarkers: MilestoneMarker[] = [];
+	private milestoneHeights = [25, 50, 75, 100];
+
+	// Round 5: Session comparison
+	private lastSession: SessionRecord | null = null;
+	private sessionPerfects = 0;
+
 	bootstrap(world: World) {
 		this.w = world;
 		this.loadTheme();
@@ -611,6 +665,10 @@ export class GameSystem extends createSystem({}) {
 		scene.add(this.particleGroup);
 		this.trailGroup = new Group();
 		scene.add(this.trailGroup);
+		this.scorePopupGroup = new Group();
+		scene.add(this.scorePopupGroup);
+		this.confettiGroup = new Group();
+		scene.add(this.confettiGroup);
 		this.createGrid(scene);
 		this.createStars(scene);
 		this.createAurora(scene);
@@ -650,9 +708,19 @@ export class GameSystem extends createSystem({}) {
 		parent.add(this.starField);
 	}
 
+	private getAuroraColors(): number[] {
+		switch (this.colorTheme) {
+			case 'fire': return [0xff6600, 0xff4400, 0xff8800, 0xffaa00, 0xff3300];
+			case 'ice': return [0x88ccff, 0x44aaff, 0xaaddff, 0x66bbff, 0x2277ff];
+			case 'vapor': return [0xff66aa, 0xaa44ff, 0x44ffcc, 0xff88cc, 0xbb66ff];
+			default: return [0x00ffaa, 0x00aaff, 0xff00aa, 0xaa00ff, 0x44ffcc];
+		}
+	}
+
 	private createAurora(parent: Object3D) {
+		if (this.auroraGroup) { parent.remove(this.auroraGroup); this.auroraWaves = []; }
 		this.auroraGroup = new Group();
-		const colors = [0x00ffaa, 0x00aaff, 0xff00aa, 0xaa00ff, 0x44ffcc];
+		const colors = this.getAuroraColors();
 		for (let i = 0; i < 5; i++) {
 			const width = 60;
 			const segments = 40;
@@ -878,6 +946,8 @@ export class GameSystem extends createSystem({}) {
 		this.updateCountdownPanel();
 		this.updateModeInfo();
 		this.audio.startDrone();
+		this.lastSession = this.loadLastSession();
+		this.sessionPerfects = 0;
 	}
 
 	private clearTower() {
@@ -892,6 +962,17 @@ export class GameSystem extends createSystem({}) {
 		this.landingAnims = [];
 		for (const tl of this.towerLights) this.towerGroup.remove(tl);
 		this.towerLights = [];
+		// Clear ripples
+		for (const r of this.rippleRings) { this.towerGroup.remove(r.mesh); r.mesh.geometry.dispose(); (r.mesh.material as MeshBasicMaterial).dispose(); }
+		this.rippleRings = [];
+		// Clear score popups
+		for (const sp of this.scorePopups) { this.scorePopupGroup.remove(sp.mesh); sp.mesh.geometry.dispose(); (sp.mesh.material as MeshBasicMaterial).dispose(); }
+		this.scorePopups = [];
+		// Clear confetti
+		for (const c of this.confettiPieces) { this.confettiGroup.remove(c.mesh); c.mesh.geometry.dispose(); (c.mesh.material as MeshBasicMaterial).dispose(); }
+		this.confettiPieces = [];
+		// Clear milestone markers
+		this.clearMilestoneMarkers();
 		this.destroyGhost();
 		this.comboFlashTime = 0;
 		this.shakeIntensity = 0;
@@ -1059,6 +1140,10 @@ export class GameSystem extends createSystem({}) {
 			}
 			this.audio.playPlace(true, this.combo);
 			this.stats.totalPerfects++;
+			this.sessionPerfects++;
+			this.triggerHaptic(0.6, 120); // Strong haptic for perfect
+			this.spawnRipple(cur.mesh.position, getBlockColor(this.blocks.length), true);
+			this.spawnScorePopup(cur.mesh.position, 10 + this.combo * 5, true);
 			// Show combo announcer for combo >= 2
 			if (this.combo >= 2) this.showComboAnnounce(this.combo);
 			// Dynamic tower light every 5 perfects
@@ -1111,6 +1196,9 @@ export class GameSystem extends createSystem({}) {
 			cur.mesh.geometry = new BoxGeometry(cur.width, BLOCK_HEIGHT, cur.depth);
 			this.audio.playPlace(false, 0);
 			this.audio.playCut();
+			this.triggerHaptic(0.3, 60); // Light haptic for imperfect
+			this.spawnRipple(cur.mesh.position, getBlockColor(this.blocks.length), false);
+			this.spawnScorePopup(cur.mesh.position, this.multiplierTimer > 0 ? 10 : 5, false);
 		}
 
 		if (this.combo > this.maxCombo) this.maxCombo = this.combo;
@@ -1139,9 +1227,14 @@ export class GameSystem extends createSystem({}) {
 		this.triggerLandingAnim(cur.mesh);
 		this.checkAchievements();
 		this.checkPowerUpEarns();
+		this.checkMilestones();
 		this.updateHUD();
 		if (cur.width < 0.1 || cur.depth < 0.1) { this.gameOver(); return; }
-		if (this.mode === 'challenge' && this.height >= this.challengeTarget) { this.score += 100; this.gameOver(); return; }
+		if (this.mode === 'challenge' && this.height >= this.challengeTarget) {
+			this.score += 100;
+			this.spawnConfetti(cur.mesh.position, 80);
+			this.gameOver(); return;
+		}
 		this.slideAxis = this.slideAxis === 'x' ? 'z' : 'x';
 		this.spawnSlidingBlock();
 	}
@@ -1398,7 +1491,12 @@ export class GameSystem extends createSystem({}) {
 			this.dailyBest = metric;
 			try { localStorage.setItem(`neon-stack-daily-${this.dailyChallenge.date}`, `${metric}`); } catch { /* */ }
 		}
-		if (this.checkDailyResult()) this.unlock('daily_win');
+		if (this.checkDailyResult()) {
+			this.unlock('daily_win');
+			// Celebrate daily challenge completion
+			const lastBlock = this.blocks[this.blocks.length - 1];
+			if (lastBlock) this.spawnConfetti(lastBlock.mesh.position, 60);
+		}
 	}
 
 	private checkPowerUpEarns() {
@@ -1430,6 +1528,7 @@ export class GameSystem extends createSystem({}) {
 		this.w.scene.background = new Color(accent.bg);
 		(this.w.scene.fog as FogExp2).color.set(accent.fog);
 		this.createGrid(this.w.scene);
+		this.createAurora(this.w.scene);
 		try { localStorage.setItem('neon-stack-theme', theme); } catch { /* */ }
 	}
 
@@ -1443,10 +1542,253 @@ export class GameSystem extends createSystem({}) {
 		} catch { /* */ }
 	}
 
+	// == Ripple Ring Effect ================================================
+
+	private spawnRipple(pos: Vector3, color: number, isPerfect: boolean) {
+		const geo = new RingGeometry(0.1, 0.15, 32);
+		const mat = new MeshBasicMaterial({
+			color, transparent: true, opacity: 0.7, side: DoubleSide,
+			blending: AdditiveBlending, depthWrite: false,
+		});
+		const mesh = new Mesh(geo, mat);
+		mesh.position.set(pos.x, pos.y, pos.z);
+		mesh.rotation.x = -Math.PI / 2;
+		this.towerGroup.add(mesh);
+		this.rippleRings.push({
+			mesh, life: isPerfect ? 0.8 : 0.5, maxLife: isPerfect ? 0.8 : 0.5,
+			maxScale: isPerfect ? 8 : 5,
+		});
+	}
+
+	private updateRipples(delta: number) {
+		for (let i = this.rippleRings.length - 1; i >= 0; i--) {
+			const r = this.rippleRings[i];
+			r.life -= delta;
+			const t = 1 - r.life / r.maxLife;
+			const scale = 1 + t * r.maxScale;
+			r.mesh.scale.set(scale, scale, 1);
+			(r.mesh.material as MeshBasicMaterial).opacity = Math.max(0, (1 - t) * 0.7);
+			if (r.life <= 0) {
+				this.towerGroup.remove(r.mesh);
+				r.mesh.geometry.dispose();
+				(r.mesh.material as MeshBasicMaterial).dispose();
+				this.rippleRings.splice(i, 1);
+			}
+		}
+	}
+
+	// == Score Popup Effect ================================================
+
+	private spawnScorePopup(pos: Vector3, points: number, isPerfect: boolean) {
+		const color = isPerfect ? 0xffdd00 : 0x88ccff;
+		const mat = new MeshBasicMaterial({
+			color, transparent: true, opacity: 1, blending: AdditiveBlending, depthWrite: false,
+		});
+		// Small diamond shape as score indicator
+		const size = isPerfect ? 0.08 : 0.05;
+		const mesh = new Mesh(new BoxGeometry(size, size, size), mat);
+		mesh.position.set(
+			pos.x + (Math.random() - 0.5) * 0.5,
+			pos.y + 0.3,
+			pos.z + (Math.random() - 0.5) * 0.5,
+		);
+		mesh.rotation.set(Math.PI / 4, 0, Math.PI / 4);
+		this.scorePopupGroup.add(mesh);
+		// Spawn multiple for bigger scores
+		const count = Math.min(Math.floor(points / 10), 5);
+		for (let j = 0; j < count; j++) {
+			const m2 = new Mesh(new BoxGeometry(size * 0.7, size * 0.7, size * 0.7), mat.clone());
+			m2.position.set(
+				pos.x + (Math.random() - 0.5) * 1,
+				pos.y + 0.2 + Math.random() * 0.3,
+				pos.z + (Math.random() - 0.5) * 1,
+			);
+			m2.rotation.set(Math.PI / 4, 0, Math.PI / 4);
+			this.scorePopupGroup.add(m2);
+			this.scorePopups.push({
+				mesh: m2,
+				life: 0.8 + Math.random() * 0.3,
+				velocity: new Vector3((Math.random() - 0.5) * 1.5, 2 + Math.random() * 2, (Math.random() - 0.5) * 1.5),
+			});
+		}
+		this.scorePopups.push({
+			mesh, life: 1.0,
+			velocity: new Vector3((Math.random() - 0.5) * 0.8, 3 + Math.random(), (Math.random() - 0.5) * 0.8),
+		});
+	}
+
+	private updateScorePopups(delta: number) {
+		for (let i = this.scorePopups.length - 1; i >= 0; i--) {
+			const sp = this.scorePopups[i];
+			sp.life -= delta;
+			sp.mesh.position.add(sp.velocity.clone().multiplyScalar(delta));
+			sp.velocity.y -= 3 * delta;
+			const t = Math.max(0, sp.life);
+			(sp.mesh.material as MeshBasicMaterial).opacity = t;
+			sp.mesh.scale.setScalar(0.5 + t * 0.5);
+			if (sp.life <= 0) {
+				this.scorePopupGroup.remove(sp.mesh);
+				sp.mesh.geometry.dispose();
+				(sp.mesh.material as MeshBasicMaterial).dispose();
+				this.scorePopups.splice(i, 1);
+			}
+		}
+	}
+
+	// == Confetti Celebration =============================================
+
+	private spawnConfetti(origin: Vector3, count: number) {
+		const colors = [0xff4444, 0x44ff44, 0x4444ff, 0xffff44, 0xff44ff, 0x44ffff, 0xff8844, 0xaa44ff];
+		for (let i = 0; i < count; i++) {
+			const color = colors[i % colors.length];
+			const w = 0.04 + Math.random() * 0.06;
+			const h = 0.08 + Math.random() * 0.1;
+			const mat = new MeshBasicMaterial({ color, transparent: true, opacity: 1, side: DoubleSide });
+			const mesh = new Mesh(new BoxGeometry(w, h, 0.005), mat);
+			mesh.position.copy(origin);
+			mesh.position.x += (Math.random() - 0.5) * 0.5;
+			mesh.position.z += (Math.random() - 0.5) * 0.5;
+			this.confettiGroup.add(mesh);
+			const angle = Math.random() * Math.PI * 2;
+			const speed = 3 + Math.random() * 5;
+			this.confettiPieces.push({
+				mesh,
+				velocity: new Vector3(
+					Math.cos(angle) * speed * 0.6,
+					4 + Math.random() * 6,
+					Math.sin(angle) * speed * 0.6,
+				),
+				rotSpeed: new Vector3(
+					(Math.random() - 0.5) * 10,
+					(Math.random() - 0.5) * 10,
+					(Math.random() - 0.5) * 10,
+				),
+				life: 3 + Math.random() * 2,
+			});
+		}
+	}
+
+	private updateConfetti(delta: number) {
+		for (let i = this.confettiPieces.length - 1; i >= 0; i--) {
+			const c = this.confettiPieces[i];
+			c.life -= delta;
+			c.velocity.y -= 6 * delta; // gravity
+			// Air resistance on horizontal
+			c.velocity.x *= 1 - delta * 0.5;
+			c.velocity.z *= 1 - delta * 0.5;
+			// Flutter effect
+			c.velocity.x += Math.sin(c.life * 5) * delta * 2;
+			c.mesh.position.add(c.velocity.clone().multiplyScalar(delta));
+			c.mesh.rotation.x += c.rotSpeed.x * delta;
+			c.mesh.rotation.y += c.rotSpeed.y * delta;
+			c.mesh.rotation.z += c.rotSpeed.z * delta;
+			if (c.life < 1) {
+				(c.mesh.material as MeshBasicMaterial).opacity = Math.max(0, c.life);
+			}
+			if (c.life <= 0 || c.mesh.position.y < -10) {
+				this.confettiGroup.remove(c.mesh);
+				c.mesh.geometry.dispose();
+				(c.mesh.material as MeshBasicMaterial).dispose();
+				this.confettiPieces.splice(i, 1);
+			}
+		}
+	}
+
+	// == Height Milestone Markers =========================================
+
+	private checkMilestones() {
+		for (const mh of this.milestoneHeights) {
+			if (this.height >= mh && !this.milestoneMarkers.find(m => m.height === mh)) {
+				this.spawnMilestoneMarker(mh);
+			}
+		}
+	}
+
+	private spawnMilestoneMarker(h: number) {
+		const y = h * BLOCK_HEIGHT + BLOCK_HEIGHT / 2;
+		const geo = new TorusGeometry(2.5, 0.02, 8, 64);
+		const color = h >= 100 ? 0xffdd00 : h >= 75 ? 0xff4488 : h >= 50 ? 0x44ffaa : 0x44aaff;
+		const mat = new MeshBasicMaterial({
+			color, transparent: true, opacity: 0.4, blending: AdditiveBlending, depthWrite: false,
+		});
+		const ring = new Mesh(geo, mat);
+		ring.position.set(0, y, 0);
+		ring.rotation.x = Math.PI / 2;
+		this.towerGroup.add(ring);
+		this.milestoneMarkers.push({ ring, height: h });
+		// Play a celebratory sound
+		this.audio.playLevelUp();
+	}
+
+	private updateMilestoneMarkers(time: number) {
+		for (const m of this.milestoneMarkers) {
+			m.ring.rotation.z = time * 0.3;
+			const pulse = 0.3 + Math.sin(time * 2 + m.height) * 0.15;
+			(m.ring.material as MeshBasicMaterial).opacity = pulse;
+		}
+	}
+
+	private clearMilestoneMarkers() {
+		for (const m of this.milestoneMarkers) {
+			this.towerGroup.remove(m.ring);
+			m.ring.geometry.dispose();
+			(m.ring.material as MeshBasicMaterial).dispose();
+		}
+		this.milestoneMarkers = [];
+	}
+
+	// == XR Haptics =======================================================
+
+	private triggerHaptic(intensity: number, duration: number) {
+		try {
+			const rg = this.w.input.gamepads.right;
+			const lg = this.w.input.gamepads.left;
+			if (rg?.gamepad?.hapticActuators?.[0]) {
+				(rg.gamepad.hapticActuators[0] as any).pulse(intensity, duration);
+			}
+			if (lg?.gamepad?.hapticActuators?.[0]) {
+				(lg.gamepad.hapticActuators[0] as any).pulse(intensity, duration);
+			}
+			// Also try vibrationActuator (WebXR standard)
+			if ((rg?.gamepad as any)?.vibrationActuator) {
+				(rg!.gamepad as any).vibrationActuator.playEffect('dual-rumble', {
+					duration, strongMagnitude: intensity, weakMagnitude: intensity * 0.5,
+				});
+			}
+			if ((lg?.gamepad as any)?.vibrationActuator) {
+				(lg!.gamepad as any).vibrationActuator.playEffect('dual-rumble', {
+					duration, strongMagnitude: intensity, weakMagnitude: intensity * 0.5,
+				});
+			}
+		} catch { /* haptics not available */ }
+	}
+
+	// == Session Tracking =================================================
+
+	private loadLastSession(): SessionRecord | null {
+		try {
+			const s = localStorage.getItem('neon-stack-last-session');
+			if (s) return JSON.parse(s);
+		} catch { /* */ }
+		return null;
+	}
+
+	private saveSession() {
+		const rec: SessionRecord = {
+			score: this.score,
+			height: this.height,
+			combo: this.maxCombo,
+			mode: this.mode,
+		};
+		try { localStorage.setItem('neon-stack-last-session', JSON.stringify(rec)); } catch { /* */ }
+		this.lastSession = rec;
+	}
+
 	// == Trail Effect =====================================================
 
 	private spawnTrail() {
 		if (!this.currentBlock || this.state !== 'playing') return;
+		if (this.trailParticles.length >= 60) return; // Performance cap
 		const pos = this.currentBlock.mesh.position;
 		const col = getBlockColor(this.blocks.length);
 		const mat = new MeshBasicMaterial({ color: col, transparent: true, opacity: 0.4, blending: AdditiveBlending });
@@ -1463,6 +1805,7 @@ export class GameSystem extends createSystem({}) {
 	private gameOver() {
 		this.audio.stopDrone();
 		this.audio.playGameOver();
+		this.triggerHaptic(0.8, 200); // Strong haptic for game over
 		this.destroyGhost();
 		this.destroyShieldVisual();
 		this.stats.gamesPlayed++;
@@ -1476,6 +1819,15 @@ export class GameSystem extends createSystem({}) {
 
 		// Save to leaderboard
 		this.isNewBest = this.saveLeaderboardEntry();
+
+		// Confetti if new best
+		if (this.isNewBest) {
+			const lastBlock = this.blocks[this.blocks.length - 1];
+			if (lastBlock) this.spawnConfetti(lastBlock.mesh.position, 100);
+		}
+
+		// Save session for comparison
+		this.saveSession();
 
 		this.updateGameOverPanel();
 		this.setState('game_over');
@@ -1606,6 +1958,15 @@ export class GameSystem extends createSystem({}) {
 			}
 		}
 
+		// Ripple rings
+		this.updateRipples(delta);
+
+		// Score popups
+		this.updateScorePopups(delta);
+
+		// Confetti
+		this.updateConfetti(delta);
+
 		// Landing animations (bounce)
 		for (let i = this.landingAnims.length - 1; i >= 0; i--) {
 			const la = this.landingAnims[i];
@@ -1632,6 +1993,9 @@ export class GameSystem extends createSystem({}) {
 
 		// Aurora animation
 		this.updateAurora(_time);
+
+		// Milestone markers
+		this.updateMilestoneMarkers(_time);
 
 		// Tower sway effect (subtle sway increases with height)
 		if ((this.state === 'playing' || this.isCountingDown) && this.towerGroup) {
@@ -1829,7 +2193,18 @@ export class GameSystem extends createSystem({}) {
 		(d.getElementById('final-combo') as UIKit.Text | undefined)?.setProperties({ text: `${this.maxCombo}` });
 		(d.getElementById('best-score') as UIKit.Text | undefined)?.setProperties({ text: `${this.stats.bestScore}` });
 		(d.getElementById('new-best-text') as UIKit.Text | undefined)?.setProperties({ text: this.isNewBest ? 'NEW BEST SCORE!' : '' });
-		(d.getElementById('final-perfects') as UIKit.Text | undefined)?.setProperties({ text: `${this.stats.totalPerfects}` });
+		(d.getElementById('final-perfects') as UIKit.Text | undefined)?.setProperties({ text: `${this.sessionPerfects}` });
+		// Session comparison
+		if (this.lastSession && this.lastSession.mode === this.mode) {
+			const scoreDiff = this.score - this.lastSession.score;
+			const heightDiff = this.height - this.lastSession.height;
+			const prefix = (n: number) => n > 0 ? `+${n}` : `${n}`;
+			(d.getElementById('session-compare') as UIKit.Text | undefined)?.setProperties({
+				text: `vs last: ${prefix(scoreDiff)} pts, ${prefix(heightDiff)} blocks`,
+			});
+		} else {
+			(d.getElementById('session-compare') as UIKit.Text | undefined)?.setProperties({ text: '' });
+		}
 	}
 
 	private updateCountdownPanel() {
@@ -2064,6 +2439,18 @@ export class GameSystem extends createSystem({}) {
 			{ id: 'all_modes_played', name: 'Versatile', description: 'Play all 6 game modes', unlocked: false },
 			{ id: 'daily_win', name: 'Daily Victor', description: 'Complete a daily challenge', unlocked: false },
 			{ id: 'combo_20_game', name: 'Unstoppable', description: '20 combo in a single game', unlocked: false },
+			// Round 5 achievements
+			{ id: 'height_25_milestone', name: 'Quarter Century', description: 'Reach height 25', unlocked: false },
+			{ id: 'height_50_milestone', name: 'Half Century Tower', description: 'Reach height 50', unlocked: false },
+			{ id: 'score_500_one', name: 'Five Hundred Club', description: 'Score 500 in one game', unlocked: false },
+			{ id: 'speed_25', name: 'Quick Stacker', description: 'Stack 25 in Speed mode', unlocked: false },
+			{ id: 'endless_30', name: 'Endurance', description: 'Stack 30 in Endless mode', unlocked: false },
+			{ id: 'combo_30_game', name: 'Legendary Streak', description: '30 combo in a single game', unlocked: false },
+			{ id: 'total_blocks_2000', name: 'Construction Foreman', description: 'Place 2000 total blocks', unlocked: false },
+			{ id: 'total_perfects_500', name: 'Ascended', description: '500 total perfect placements', unlocked: false },
+			{ id: 'games_200', name: 'Devoted', description: 'Play 200 games', unlocked: false },
+			{ id: 'daily_3', name: 'Streak Runner', description: 'Complete 3 daily challenges', unlocked: false },
+			{ id: 'precision_15', name: 'Surgical', description: 'All perfects with 15+ blocks in Precision', unlocked: false },
 		];
 		try {
 			const s = localStorage.getItem('neon-stack-achievements');
@@ -2150,6 +2537,26 @@ export class GameSystem extends createSystem({}) {
 		if (this.height >= 80) this.unlock('height_80');
 		if (this.stats.totalScore >= 100000) this.unlock('total_score_100000');
 		if (this.maxCombo >= 20) this.unlock('combo_20_game');
+		// Round 5 achievements
+		if (this.height >= 25) this.unlock('height_25_milestone');
+		if (this.height >= 50) this.unlock('height_50_milestone');
+		if (this.score >= 500) this.unlock('score_500_one');
+		if (this.mode === 'speed' && this.height >= 25) this.unlock('speed_25');
+		if (this.mode === 'endless' && this.height >= 30) this.unlock('endless_30');
+		if (this.maxCombo >= 30) this.unlock('combo_30_game');
+		if (this.stats.totalBlocks >= 2000) this.unlock('total_blocks_2000');
+		if (this.stats.totalPerfects >= 500) this.unlock('total_perfects_500');
+		if (this.stats.gamesPlayed >= 200) this.unlock('games_200');
+		if (this.mode === 'precision' && this.height >= 15 && this.combo === this.height - 1) this.unlock('precision_15');
+		// Check daily streak (count stored daily keys)
+		try {
+			let dailyCount = 0;
+			for (let k = 0; k < localStorage.length; k++) {
+				const key = localStorage.key(k);
+				if (key && key.startsWith('neon-stack-daily-')) dailyCount++;
+			}
+			if (dailyCount >= 3) this.unlock('daily_3');
+		} catch { /* */ }
 		// Check all modes played
 		const modesPlayed = ['mode_classic', 'mode_zen', 'mode_speed', 'mode_precision', 'mode_challenge', 'mode_endless'];
 		if (modesPlayed.every(m => this.achievements.find(a => a.id === m)?.unlocked)) this.unlock('all_modes_played');

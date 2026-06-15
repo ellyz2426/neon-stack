@@ -1,6 +1,7 @@
-<panel width="500" height="520" backgroundColor="#0a0a1aee" borderRadius="16" borderWidth="2" borderColor="#ff444444" padding="24">
-  <container flexDirection="column" alignItems="center" gap="14" width="100%">
+<panel width="500" height="560" backgroundColor="#0a0a1aee" borderRadius="16" borderWidth="2" borderColor="#ff444444" padding="24">
+  <container flexDirection="column" alignItems="center" gap="12" width="100%">
     <text fontSize="40" fontWeight="bold" color="#ff4444">GAME OVER</text>
+    <text id="new-best-text" fontSize="20" fontWeight="bold" color="#ffaa00"> </text>
     <container flexDirection="column" gap="6" alignItems="center">
       <container flexDirection="row" gap="8" alignItems="center">
         <text fontSize="14" color="#888899">SCORE</text>
@@ -17,6 +18,10 @@
       <container flexDirection="row" gap="8" alignItems="center">
         <text fontSize="14" color="#888899">BEST</text>
         <text id="best-score" fontSize="20" fontWeight="bold" color="#ffaa00">0</text>
+      </container>
+      <container flexDirection="row" gap="8" alignItems="center">
+        <text fontSize="12" color="#666677">PERFECTS</text>
+        <text id="final-perfects" fontSize="16" color="#88aacc">0</text>
       </container>
     </container>
     <container flexDirection="column" gap="10" width="80%">

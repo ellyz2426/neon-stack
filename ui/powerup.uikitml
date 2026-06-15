@@ -1,0 +1,6 @@
+<panel width="300" height="60" backgroundColor="#00000000" borderRadius="10">
+  <container flexDirection="column" alignItems="center" gap="2">
+    <text id="powerup-name" fontSize="16" fontWeight="bold" color="#ffaa00"> </text>
+    <text id="powerup-timer" fontSize="12" color="#ffffff88"> </text>
+  </container>
+</panel>

@@ -1,5 +1,5 @@
-<panel width="480" height="420" backgroundColor="#0a0a1aee" borderRadius="16" borderWidth="2" borderColor="#ffaa0044" padding="24">
-  <container flexDirection="column" alignItems="center" gap="14" width="100%">
+<panel width="480" height="500" backgroundColor="#0a0a1aee" borderRadius="16" borderWidth="2" borderColor="#ffaa0044" padding="24">
+  <container flexDirection="column" alignItems="center" gap="12" width="100%">
     <text fontSize="28" fontWeight="bold" color="#ffaa00">SETTINGS</text>
     <container flexDirection="column" gap="10" width="100%">
       <container flexDirection="row" justifyContent="space-between" alignItems="center" padding="6">
@@ -17,6 +17,14 @@
       <container flexDirection="row" justifyContent="space-between" alignItems="center" padding="6">
         <text id="btn-music-toggle" fontSize="16" color="#ccccdd">Music</text>
         <text id="music-val" fontSize="16" fontWeight="bold" color="#00ff88">ON</text>
+      </container>
+      <container flexDirection="row" justifyContent="space-between" alignItems="center" padding="6">
+        <text fontSize="16" color="#ccccdd">Theme</text>
+        <container flexDirection="row" gap="6" alignItems="center">
+          <text id="btn-theme-prev" fontSize="18" color="#ffffff" backgroundColor="#ffffff22" borderRadius="4" padding="4" textAlign="center">&lt;</text>
+          <text id="theme-val" fontSize="14" fontWeight="bold" color="#ffaa00">NEON</text>
+          <text id="btn-theme-next" fontSize="18" color="#ffffff" backgroundColor="#ffffff22" borderRadius="4" padding="4" textAlign="center">&gt;</text>
+        </container>
       </container>
     </container>
     <text id="btn-settings-back" fontSize="18" color="#ff4444" backgroundColor="#ff444422" borderRadius="8" padding="10" textAlign="center" borderWidth="1" borderColor="#ff444444" width="80%">BACK</text>

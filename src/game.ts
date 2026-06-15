@@ -75,6 +75,29 @@ interface LandingAnim {
 
 type GameMode = 'classic' | 'zen' | 'speed' | 'precision' | 'challenge' | 'endless';
 type GameState = 'menu' | 'mode_select' | 'playing' | 'paused' | 'game_over' | 'settings' | 'achievements' | 'tutorial' | 'stats' | 'leaderboard';
+type PowerUpType = 'slowmo' | 'widthboost';
+type ColorTheme = 'neon' | 'fire' | 'ice' | 'vapor';
+
+interface PowerUp {
+	type: PowerUpType;
+	active: boolean;
+	timer: number;
+	duration: number;
+}
+
+const COLOR_THEMES: Record<ColorTheme, number[]> = {
+	neon: [0x00ffff, 0xff00ff, 0x00ff88, 0xff4488, 0x44aaff, 0xffaa00, 0xaa44ff, 0x88ff00, 0xff6644, 0x44ffaa],
+	fire: [0xff4400, 0xff6600, 0xff8800, 0xffaa00, 0xffcc00, 0xff3300, 0xff5500, 0xff7700, 0xff9900, 0xffbb00],
+	ice: [0x88ccff, 0xaaddff, 0x44aaff, 0x66bbff, 0xccddff, 0x4488ff, 0x99ccff, 0xbbddff, 0x2277ff, 0xddeeff],
+	vapor: [0xff66aa, 0xaa44ff, 0x44ffcc, 0xff88cc, 0x8844ff, 0x66ffdd, 0xff44aa, 0xbb66ff, 0x55ffbb, 0xff77bb],
+};
+
+const THEME_ACCENTS: Record<ColorTheme, { bg: number; fog: number; grid: number; gridEmit: number }> = {
+	neon: { bg: 0x050510, fog: 0x050510, grid: 0x00ffff, gridEmit: 0x006688 },
+	fire: { bg: 0x100505, fog: 0x100505, grid: 0xff6600, gridEmit: 0x882200 },
+	ice: { bg: 0x050810, fog: 0x050810, grid: 0x88ccff, gridEmit: 0x224488 },
+	vapor: { bg: 0x0a0510, fog: 0x0a0510, grid: 0xff66aa, gridEmit: 0x662244 },
+};
 
 interface Achievement {
 	id: string;
@@ -376,11 +399,8 @@ class AudioEngine {
 
 // == Constants ==============================================================
 
-const NEON_COLORS = [
-	0x00ffff, 0xff00ff, 0x00ff88, 0xff4488, 0x44aaff,
-	0xffaa00, 0xaa44ff, 0x88ff00, 0xff6644, 0x44ffaa,
-];
-const getBlockColor = (i: number) => NEON_COLORS[i % NEON_COLORS.length];
+let activeThemeColors = COLOR_THEMES.neon;
+const getBlockColor = (i: number) => activeThemeColors[i % activeThemeColors.length];
 
 const BLOCK_HEIGHT = 0.3;
 const BASE_WIDTH = 3.0;
@@ -495,8 +515,20 @@ export class GameSystem extends createSystem({}) {
 	// New best indicator
 	private isNewBest = false;
 
+	// Power-ups
+	private powerUps: PowerUp[] = [];
+	private slowMoAwarded = false;
+	private widthBoostAwarded = false;
+	private powerupEntity: Entity | null = null;
+	private powerupNotifyTimer = 0;
+
+	// Color theme
+	private colorTheme: ColorTheme = 'neon';
+	private gridGroup: Group | null = null;
+
 	bootstrap(world: World) {
 		this.w = world;
+		this.loadTheme();
 		this.loadStats();
 		this.loadAchievements();
 		this.loadLeaderboards();
@@ -506,8 +538,9 @@ export class GameSystem extends createSystem({}) {
 
 	private setupScene() {
 		const scene = this.w.scene;
-		scene.fog = new FogExp2(0x050510, 0.015);
-		scene.background = new Color(0x050510);
+		const accent = THEME_ACCENTS[this.colorTheme];
+		scene.fog = new FogExp2(accent.fog, 0.015);
+		scene.background = new Color(accent.bg);
 
 		// Override the default environment lighting
 		scene.environment = null;
@@ -537,13 +570,16 @@ export class GameSystem extends createSystem({}) {
 	}
 
 	private createGrid(parent: Object3D) {
+		if (this.gridGroup) parent.remove(this.gridGroup);
 		const g = new Group();
+		this.gridGroup = g;
+		const accent = THEME_ACCENTS[this.colorTheme];
 		const size = 40; const divs = 40; const step = size / divs; const half = size / 2;
 		for (let i = 0; i <= divs; i++) {
 			const pos = -half + i * step;
 			const main = i % 5 === 0;
-			const c = main ? 0x00ffff : 0x112233;
-			const e = main ? 0x006688 : 0x060612;
+			const c = main ? accent.grid : 0x112233;
+			const e = main ? accent.gridEmit : 0x060612;
 			const xL = new Mesh(new BoxGeometry(size, 0.008, 0.008), new MeshStandardMaterial({ color: c, emissive: e, emissiveIntensity: main ? 0.8 : 0.3 }));
 			xL.position.set(0, 0, pos); g.add(xL);
 			const zL = new Mesh(new BoxGeometry(0.008, 0.008, size), new MeshStandardMaterial({ color: c, emissive: e, emissiveIntensity: main ? 0.8 : 0.3 }));
@@ -629,6 +665,11 @@ export class GameSystem extends createSystem({}) {
 		this.leaderboardEntity.addComponent(PanelUI, { config: './ui/leaderboard.json' });
 		this.leaderboardEntity.addComponent(Follower, { target: cam, offsetPosition: [0, 0, -2.5], speed: 6 });
 		this.leaderboardEntity.object3D!.visible = false;
+
+		this.powerupEntity = w.createTransformEntity();
+		this.powerupEntity.addComponent(PanelUI, { config: './ui/powerup.json' });
+		this.powerupEntity.addComponent(Follower, { target: cam, offsetPosition: [0, 0.35, -1.5], speed: 10 });
+		this.powerupEntity.object3D!.visible = false;
 	}
 
 	// == State ============================================================
@@ -706,6 +747,9 @@ export class GameSystem extends createSystem({}) {
 		this.gameTime = 0; this.slideSpeed = BASE_SPEED; this.slideAxis = 'x';
 		this.slideDir = 1; this.speedTimeLeft = 60; this.placeCooldown = 0;
 		this.lastCountdownNum = -1; this.lastMilestone = 0; this.isNewBest = false;
+		this.powerUps = []; this.slowMoAwarded = false; this.widthBoostAwarded = false;
+		this.powerupNotifyTimer = 0;
+		if (this.powerupEntity?.object3D) this.powerupEntity.object3D.visible = false;
 		if (mode === 'challenge') this.challengeTarget = 15 + Math.floor(Math.random() * 20);
 		this.clearTower();
 		this.createBaseBlock();
@@ -864,6 +908,8 @@ export class GameSystem extends createSystem({}) {
 			}
 		} else {
 			this.combo = 0;
+			this.slowMoAwarded = false;
+			this.widthBoostAwarded = false;
 			this.score += 5;
 			this.triggerShake(0.015);
 			if (this.slideAxis === 'z') {
@@ -928,6 +974,7 @@ export class GameSystem extends createSystem({}) {
 		this.destroyGhost();
 		this.triggerLandingAnim(cur.mesh);
 		this.checkAchievements();
+		this.checkPowerUpEarns();
 		this.updateHUD();
 		if (cur.width < 0.1 || cur.depth < 0.1) { this.gameOver(); return; }
 		if (this.mode === 'challenge' && this.height >= this.challengeTarget) { this.score += 100; this.gameOver(); return; }
@@ -966,6 +1013,109 @@ export class GameSystem extends createSystem({}) {
 	private triggerShake(intensity: number) {
 		this.shakeIntensity = Math.max(this.shakeIntensity, intensity);
 		this.shakeTime = 0.15;
+	}
+
+	// == Power-ups ========================================================
+
+	private activatePowerUp(type: PowerUpType) {
+		const existing = this.powerUps.find(p => p.type === type);
+		if (existing && existing.active) {
+			existing.timer = existing.duration; // refresh
+			return;
+		}
+		const duration = type === 'slowmo' ? 5 : 0; // width boost is instant
+		const pu: PowerUp = { type, active: true, timer: duration, duration };
+		this.powerUps.push(pu);
+
+		if (type === 'slowmo') {
+			this.slideSpeed *= 0.4;
+			this.showPowerUpNotify('SLOW-MO!', '#ffaa00');
+		} else if (type === 'widthboost') {
+			if (this.currentBlock) {
+				this.currentBlock.width = Math.min(BASE_WIDTH, this.currentBlock.width + 0.5);
+				this.currentBlock.depth = Math.min(BASE_DEPTH, this.currentBlock.depth + 0.5);
+				this.currentBlock.mesh.geometry.dispose();
+				this.currentBlock.mesh.geometry = new BoxGeometry(this.currentBlock.width, BLOCK_HEIGHT, this.currentBlock.depth);
+			}
+			this.showPowerUpNotify('WIDTH BOOST!', '#00ff88');
+			pu.active = false; // instant
+		}
+		this.audio.playLevelUp();
+	}
+
+	private updatePowerUps(delta: number) {
+		for (let i = this.powerUps.length - 1; i >= 0; i--) {
+			const pu = this.powerUps[i];
+			if (!pu.active) { this.powerUps.splice(i, 1); continue; }
+			pu.timer -= delta;
+			if (pu.timer <= 0) {
+				pu.active = false;
+				if (pu.type === 'slowmo') {
+					// Restore speed
+					this.slideSpeed = Math.min(MAX_SPEED, BASE_SPEED + (this.height - 1) * SPEED_INCREMENT);
+				}
+				this.powerUps.splice(i, 1);
+			}
+		}
+		// Update powerup HUD
+		const activePU = this.powerUps.find(p => p.active && p.type === 'slowmo');
+		if (activePU) {
+			this.updatePowerUpPanel(activePU);
+		} else if (this.powerupNotifyTimer <= 0 && this.powerupEntity?.object3D?.visible) {
+			this.powerupEntity.object3D.visible = false;
+		}
+	}
+
+	private showPowerUpNotify(text: string, _color: string) {
+		const d = this.getDoc(this.powerupEntity);
+		if (!d) return;
+		(d.getElementById('powerup-name') as UIKit.Text | undefined)?.setProperties({ text });
+		(d.getElementById('powerup-timer') as UIKit.Text | undefined)?.setProperties({ text: '' });
+		if (this.powerupEntity?.object3D) this.powerupEntity.object3D.visible = true;
+		this.powerupNotifyTimer = 2;
+	}
+
+	private updatePowerUpPanel(pu: PowerUp) {
+		const d = this.getDoc(this.powerupEntity);
+		if (!d) return;
+		const timeLeft = Math.ceil(pu.timer);
+		(d.getElementById('powerup-name') as UIKit.Text | undefined)?.setProperties({ text: 'SLOW-MO' });
+		(d.getElementById('powerup-timer') as UIKit.Text | undefined)?.setProperties({ text: `${timeLeft}s` });
+		if (this.powerupEntity?.object3D) this.powerupEntity.object3D.visible = true;
+	}
+
+	private checkPowerUpEarns() {
+		// Slow-Mo at 3 combo (resets each game)
+		if (this.combo >= 3 && !this.slowMoAwarded) {
+			this.slowMoAwarded = true;
+			this.activatePowerUp('slowmo');
+		}
+		// Width Boost at 7 combo
+		if (this.combo >= 7 && !this.widthBoostAwarded) {
+			this.widthBoostAwarded = true;
+			this.activatePowerUp('widthboost');
+		}
+		// Reset flags when combo breaks so they can be re-earned
+	}
+
+	private setTheme(theme: ColorTheme) {
+		this.colorTheme = theme;
+		activeThemeColors = COLOR_THEMES[theme];
+		const accent = THEME_ACCENTS[theme];
+		this.w.scene.background = new Color(accent.bg);
+		(this.w.scene.fog as FogExp2).color.set(accent.fog);
+		this.createGrid(this.w.scene);
+		try { localStorage.setItem('neon-stack-theme', theme); } catch { /* */ }
+	}
+
+	private loadTheme() {
+		try {
+			const t = localStorage.getItem('neon-stack-theme') as ColorTheme | null;
+			if (t && COLOR_THEMES[t]) {
+				this.colorTheme = t;
+				activeThemeColors = COLOR_THEMES[t];
+			}
+		} catch { /* */ }
 	}
 
 	// == Trail Effect =====================================================
@@ -1040,6 +1190,7 @@ export class GameSystem extends createSystem({}) {
 
 		if (this.state === 'playing') {
 			this.gameTime += delta;
+			this.updatePowerUps(delta);
 			if (this.currentBlock) {
 				const p = this.currentBlock.mesh.position;
 				if (this.slideAxis === 'x') {
@@ -1171,6 +1322,25 @@ export class GameSystem extends createSystem({}) {
 			if (this.shakeTime <= 0) this.shakeIntensity = 0;
 		}
 
+		// Power-up notification timer
+		if (this.powerupNotifyTimer > 0) {
+			this.powerupNotifyTimer -= delta;
+			if (this.powerupNotifyTimer <= 0 && !this.powerUps.some(p => p.active)) {
+				if (this.powerupEntity?.object3D) this.powerupEntity.object3D.visible = false;
+			}
+		}
+
+		// Width danger indicator
+		if (this.state === 'playing' && this.currentBlock) {
+			const widthPct = this.currentBlock.width / BASE_WIDTH;
+			if (widthPct < 0.35) {
+				// Danger: fast red pulse on sliding block
+				const danger = 0.5 + Math.sin(performance.now() * 0.015) * 0.5;
+				(this.currentBlock.mesh.material as MeshStandardMaterial).emissive.setHex(0xff2200);
+				(this.currentBlock.mesh.material as MeshStandardMaterial).emissiveIntensity = 0.3 + danger * 0.5;
+			}
+		}
+
 		// Pulse the current sliding block
 		if (this.currentBlock && this.state === 'playing') {
 			const pulse = 0.3 + Math.sin(_time * 8) * 0.15;
@@ -1228,6 +1398,28 @@ export class GameSystem extends createSystem({}) {
 		(d.getElementById('combo') as UIKit.Text | undefined)?.setProperties({ text: this.combo > 0 ? `x${this.combo}` : '' });
 		(d.getElementById('combo-label') as UIKit.Text | undefined)?.setProperties({ text: this.combo > 0 ? 'COMBO' : '' });
 		(d.getElementById('height') as UIKit.Text | undefined)?.setProperties({ text: `${this.height}` });
+
+		// Width danger
+		const lastBlock = this.blocks[this.blocks.length - 1];
+		if (lastBlock) {
+			const widthPct = Math.min(lastBlock.width / BASE_WIDTH, lastBlock.depth / BASE_DEPTH);
+			if (widthPct < 0.35) {
+				(d.getElementById('width-warn') as UIKit.Text | undefined)?.setProperties({ text: 'DANGER! NARROW BLOCK' });
+			} else if (widthPct < 0.55) {
+				(d.getElementById('width-warn') as UIKit.Text | undefined)?.setProperties({ text: 'Getting narrow...' });
+			} else {
+				(d.getElementById('width-warn') as UIKit.Text | undefined)?.setProperties({ text: '' });
+			}
+		}
+
+		// Power-up status
+		const slowmo = this.powerUps.find(p => p.type === 'slowmo' && p.active);
+		if (slowmo) {
+			(d.getElementById('powerup-status') as UIKit.Text | undefined)?.setProperties({ text: `SLOW-MO ${Math.ceil(slowmo.timer)}s` });
+		} else {
+			const comboToNext = this.combo < 3 ? `${3 - this.combo} to Slow-Mo` : this.combo < 7 ? `${7 - this.combo} to Width+` : '';
+			(d.getElementById('powerup-status') as UIKit.Text | undefined)?.setProperties({ text: comboToNext });
+		}
 	}
 
 	private updateModeInfo() {
@@ -1254,6 +1446,8 @@ export class GameSystem extends createSystem({}) {
 		(d.getElementById('final-height') as UIKit.Text | undefined)?.setProperties({ text: `${this.height}` });
 		(d.getElementById('final-combo') as UIKit.Text | undefined)?.setProperties({ text: `${this.maxCombo}` });
 		(d.getElementById('best-score') as UIKit.Text | undefined)?.setProperties({ text: `${this.stats.bestScore}` });
+		(d.getElementById('new-best-text') as UIKit.Text | undefined)?.setProperties({ text: this.isNewBest ? 'NEW BEST SCORE!' : '' });
+		(d.getElementById('final-perfects') as UIKit.Text | undefined)?.setProperties({ text: `${this.stats.totalPerfects}` });
 	}
 
 	private updateCountdownPanel() {
@@ -1277,6 +1471,8 @@ export class GameSystem extends createSystem({}) {
 		(d.getElementById('volume-val') as UIKit.Text | undefined)?.setProperties({ text: `${Math.round(this.audio.volume * 100)}%` });
 		(d.getElementById('sfx-val') as UIKit.Text | undefined)?.setProperties({ text: this.audio.sfxEnabled ? 'ON' : 'OFF' });
 		(d.getElementById('music-val') as UIKit.Text | undefined)?.setProperties({ text: this.audio.musicEnabled ? 'ON' : 'OFF' });
+		const themeNames: Record<ColorTheme, string> = { neon: 'NEON', fire: 'FIRE', ice: 'ICE', vapor: 'VAPOR' };
+		(d.getElementById('theme-val') as UIKit.Text | undefined)?.setProperties({ text: themeNames[this.colorTheme] });
 	}
 
 	private updateAchievementsPanel() {
@@ -1284,7 +1480,7 @@ export class GameSystem extends createSystem({}) {
 		if (!d) return;
 		const u = this.achievements.filter((a) => a.unlocked).length;
 		(d.getElementById('ach-total') as UIKit.Text | undefined)?.setProperties({ text: `${u} / ${this.achievements.length}` });
-		for (let i = 0; i < 12 && i < this.achievements.length; i++) {
+		for (let i = 0; i < 16 && i < this.achievements.length; i++) {
 			const a = this.achievements[i];
 			(d.getElementById(`ach-name-${i}`) as UIKit.Text | undefined)?.setProperties({ text: a.unlocked ? a.name : '???' });
 			(d.getElementById(`ach-desc-${i}`) as UIKit.Text | undefined)?.setProperties({ text: a.unlocked ? a.description : 'Locked' });
@@ -1372,6 +1568,19 @@ export class GameSystem extends createSystem({}) {
 			this.btn(d, 'btn-vol-down', () => { this.audio.setVolume(Math.max(0, this.audio.volume - 0.1)); this.updateSettingsPanel(); });
 			this.btn(d, 'btn-sfx-toggle', () => { this.audio.sfxEnabled = !this.audio.sfxEnabled; this.updateSettingsPanel(); });
 			this.btn(d, 'btn-music-toggle', () => { this.audio.musicEnabled = !this.audio.musicEnabled; this.updateSettingsPanel(); });
+			const themes: ColorTheme[] = ['neon', 'fire', 'ice', 'vapor'];
+			this.btn(d, 'btn-theme-next', () => {
+				const idx = themes.indexOf(this.colorTheme);
+				this.setTheme(themes[(idx + 1) % themes.length]);
+				this.updateSettingsPanel();
+				this.audio.playMenuSelect();
+			});
+			this.btn(d, 'btn-theme-prev', () => {
+				const idx = themes.indexOf(this.colorTheme);
+				this.setTheme(themes[(idx - 1 + themes.length) % themes.length]);
+				this.updateSettingsPanel();
+				this.audio.playMenuSelect();
+			});
 			this.btn(d, 'btn-settings-back', () => { this.audio.playMenuSelect(); this.setState('menu'); });
 		});
 		this.wire('ach', this.achievementsEntity, (d) => { this.btn(d, 'btn-ach-back', () => { this.audio.playMenuSelect(); this.setState('menu'); }); });
@@ -1449,6 +1658,16 @@ export class GameSystem extends createSystem({}) {
 			{ id: 'total_score_10000', name: 'Point Hoarder', description: '10,000 total points', unlocked: false },
 			{ id: 'narrow_escape', name: 'Razor Thin', description: 'Place a block with < 0.3 width', unlocked: false },
 			{ id: 'perfect_pct_50', name: 'Above Average', description: '50%+ perfect rate (20+ blocks)', unlocked: false },
+			{ id: 'slowmo_earn', name: 'Time Bender', description: 'Earn a Slow-Mo power-up', unlocked: false },
+			{ id: 'widthboost_earn', name: 'Size Matters', description: 'Earn a Width Boost power-up', unlocked: false },
+			{ id: 'height_40', name: 'Stratosphere', description: 'Stack 40 blocks', unlocked: false },
+			{ id: 'height_60', name: 'Exosphere', description: 'Stack 60 blocks', unlocked: false },
+			{ id: 'score_3000', name: 'Elite', description: 'Score 3000 points', unlocked: false },
+			{ id: 'total_score_25000', name: 'Fortune', description: '25,000 total points', unlocked: false },
+			{ id: 'total_score_50000', name: 'Treasure', description: '50,000 total points', unlocked: false },
+			{ id: 'games_100', name: 'Centurion Player', description: 'Play 100 games', unlocked: false },
+			{ id: 'zen_50', name: 'Inner Peace', description: 'Stack 50 in Zen mode', unlocked: false },
+			{ id: 'speed_30', name: 'Lightning', description: 'Stack 30 in Speed mode', unlocked: false },
 		];
 		try {
 			const s = localStorage.getItem('neon-stack-achievements');
@@ -1521,6 +1740,16 @@ export class GameSystem extends createSystem({}) {
 		const lb = this.blocks[this.blocks.length - 1];
 		if (lb && (lb.width < 0.3 || lb.depth < 0.3)) this.unlock('narrow_escape');
 		if (this.height >= 20 && this.stats.totalBlocks > 0 && this.stats.totalPerfects / this.stats.totalBlocks >= 0.5) this.unlock('perfect_pct_50');
+		if (this.slowMoAwarded) this.unlock('slowmo_earn');
+		if (this.widthBoostAwarded) this.unlock('widthboost_earn');
+		if (this.height >= 40) this.unlock('height_40');
+		if (this.height >= 60) this.unlock('height_60');
+		if (this.score >= 3000) this.unlock('score_3000');
+		if (this.stats.totalScore >= 25000) this.unlock('total_score_25000');
+		if (this.stats.totalScore >= 50000) this.unlock('total_score_50000');
+		if (this.stats.gamesPlayed >= 100) this.unlock('games_100');
+		if (this.mode === 'zen' && this.height >= 50) this.unlock('zen_50');
+		if (this.mode === 'speed' && this.height >= 30) this.unlock('speed_30');
 	}
 
 	// == Leaderboards =====================================================

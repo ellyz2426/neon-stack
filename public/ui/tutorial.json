@@ -87,7 +87,7 @@
             ],
             "properties": {
               "flexdirection": "column",
-              "gap": "6",
+              "gap": "5",
               "width": "100%"
             },
             "dataUid": "uid-4"
@@ -160,10 +160,59 @@
             ],
             "properties": {
               "flexdirection": "column",
-              "gap": "4",
+              "gap": "3",
               "width": "100%"
             },
             "dataUid": "uid-10"
+          },
+          {
+            "sourceTag": "container",
+            "type": "custom",
+            "children": [
+              {
+                "sourceTag": "text",
+                "type": "custom",
+                "children": [
+                  "Power-Ups"
+                ],
+                "properties": {
+                  "fontsize": "16",
+                  "fontweight": "bold",
+                  "color": "#ffaa00"
+                },
+                "dataUid": "uid-17"
+              },
+              {
+                "sourceTag": "text",
+                "type": "custom",
+                "children": [
+                  "3 combo = Slow-Mo (block slows down)"
+                ],
+                "properties": {
+                  "fontsize": "13",
+                  "color": "#ccccdd"
+                },
+                "dataUid": "uid-18"
+              },
+              {
+                "sourceTag": "text",
+                "type": "custom",
+                "children": [
+                  "7 combo = Width Boost (block grows)"
+                ],
+                "properties": {
+                  "fontsize": "13",
+                  "color": "#ccccdd"
+                },
+                "dataUid": "uid-19"
+              }
+            ],
+            "properties": {
+              "flexdirection": "column",
+              "gap": "3",
+              "width": "100%"
+            },
+            "dataUid": "uid-16"
           },
           {
             "sourceTag": "container",
@@ -180,7 +229,7 @@
                   "fontweight": "bold",
                   "color": "#00ff88"
                 },
-                "dataUid": "uid-17"
+                "dataUid": "uid-21"
               },
               {
                 "sourceTag": "text",
@@ -192,27 +241,39 @@
                   "fontsize": "13",
                   "color": "#ccccdd"
                 },
-                "dataUid": "uid-18"
+                "dataUid": "uid-22"
               },
               {
                 "sourceTag": "text",
                 "type": "custom",
                 "children": [
-                  "Try Zen mode for a relaxed session."
+                  "Watch the danger warning on HUD!"
                 ],
                 "properties": {
                   "fontsize": "13",
                   "color": "#ccccdd"
                 },
-                "dataUid": "uid-19"
+                "dataUid": "uid-23"
+              },
+              {
+                "sourceTag": "text",
+                "type": "custom",
+                "children": [
+                  "Change themes in Settings!"
+                ],
+                "properties": {
+                  "fontsize": "13",
+                  "color": "#ccccdd"
+                },
+                "dataUid": "uid-24"
               }
             ],
             "properties": {
               "flexdirection": "column",
-              "gap": "4",
+              "gap": "3",
               "width": "100%"
             },
-            "dataUid": "uid-16"
+            "dataUid": "uid-20"
           },
           {
             "sourceTag": "text",
@@ -232,13 +293,13 @@
               "bordercolor": "#ff444444",
               "width": "80%"
             },
-            "dataUid": "uid-20"
+            "dataUid": "uid-25"
           }
         ],
         "properties": {
           "flexdirection": "column",
           "alignitems": "center",
-          "gap": "12",
+          "gap": "10",
           "width": "100%"
         },
         "dataUid": "uid-2"
@@ -246,7 +307,7 @@
     ],
     "properties": {
       "width": "480",
-      "height": "540",
+      "height": "600",
       "backgroundcolor": "#0a0a1aee",
       "borderradius": "16",
       "borderwidth": "2",
@@ -263,7 +324,7 @@
         "column": 0
       },
       "end": {
-        "line": 24,
+        "line": 30,
         "column": 8
       }
     },
@@ -273,7 +334,7 @@
         "column": 2
       },
       "end": {
-        "line": 23,
+        "line": 29,
         "column": 14
       }
     },
@@ -424,7 +485,7 @@
       },
       "end": {
         "line": 18,
-        "column": 71
+        "column": 76
       }
     },
     "uid-18": {
@@ -434,7 +495,7 @@
       },
       "end": {
         "line": 19,
-        "column": 77
+        "column": 85
       }
     },
     "uid-19": {
@@ -453,7 +514,57 @@
         "column": 4
       },
       "end": {
-        "line": 22,
+        "line": 27,
+        "column": 16
+      }
+    },
+    "uid-21": {
+      "start": {
+        "line": 23,
+        "column": 6
+      },
+      "end": {
+        "line": 23,
+        "column": 71
+      }
+    },
+    "uid-22": {
+      "start": {
+        "line": 24,
+        "column": 6
+      },
+      "end": {
+        "line": 24,
+        "column": 77
+      }
+    },
+    "uid-23": {
+      "start": {
+        "line": 25,
+        "column": 6
+      },
+      "end": {
+        "line": 25,
+        "column": 81
+      }
+    },
+    "uid-24": {
+      "start": {
+        "line": 26,
+        "column": 6
+      },
+      "end": {
+        "line": 26,
+        "column": 75
+      }
+    },
+    "uid-25": {
+      "start": {
+        "line": 28,
+        "column": 4
+      },
+      "end": {
+        "line": 28,
         "column": 203
       }
     }

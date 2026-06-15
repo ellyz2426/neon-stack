@@ -279,15 +279,20 @@ const SLIDE_RANGE = 5.0;
 class KeyboardState {
 	private pressed = new Set<string>();
 	private justDown = new Set<string>();
+	clicked = false;
 	constructor() {
 		window.addEventListener('keydown', (e) => {
 			if (!this.pressed.has(e.code)) this.justDown.add(e.code);
 			this.pressed.add(e.code);
 		});
 		window.addEventListener('keyup', (e) => { this.pressed.delete(e.code); });
+		window.addEventListener('pointerdown', (e) => {
+			const t = e.target as HTMLElement;
+			if (t.tagName === 'CANVAS') this.clicked = true;
+		});
 	}
 	getKeyDown(code: string) { return this.justDown.has(code); }
-	endFrame() { this.justDown.clear(); }
+	endFrame() { this.justDown.clear(); this.clicked = false; }
 }
 
 // ── Main System ────────────────────────────────────────────────────────────
@@ -336,6 +341,9 @@ export class GameSystem extends createSystem({}) {
 	private cameraCurrentY = 5;
 	private placeCooldown = 0;
 	private lastCountdownNum = -1;
+	private envHue = 0;
+	private towerLights: PointLight[] = [];
+	private comboFlashTime = 0;
 
 	bootstrap(world: World) {
 		this.w = world;
@@ -508,6 +516,9 @@ export class GameSystem extends createSystem({}) {
 		this.fallingPieces = [];
 		for (const p of this.particles) this.particleGroup.remove(p.mesh);
 		this.particles = [];
+		for (const tl of this.towerLights) this.towerGroup.remove(tl);
+		this.towerLights = [];
+		this.comboFlashTime = 0;
 		this.cameraTargetY = 5; this.cameraCurrentY = 5;
 	}
 
@@ -555,10 +566,53 @@ export class GameSystem extends createSystem({}) {
 
 		if (this.slideAxis === 'z') {
 			const overlap = prev.depth - Math.abs(offZ);
-			if (overlap <= 0) { this.gameOver(); return; }
+			if (overlap <= 0) {
+				if (this.mode === 'zen') {
+					// Zen: no game over, reset to full size
+					cur.mesh.position.z = prev.z;
+					cur.depth = prev.depth;
+					cur.mesh.geometry.dispose();
+					cur.mesh.geometry = new BoxGeometry(cur.width, BLOCK_HEIGHT, cur.depth);
+					this.combo = 0;
+					this.audio.playCut();
+					cur.x = cur.mesh.position.x;
+					cur.z = cur.mesh.position.z;
+					this.blocks.push(cur);
+					this.currentBlock = null;
+					this.height = this.blocks.length;
+					this.stats.totalBlocks++;
+					this.cameraTargetY = Math.max(5, cur.y + 3);
+					this.updateHUD();
+					this.slideAxis = 'x';
+					this.spawnSlidingBlock();
+					return;
+				}
+				this.gameOver(); return;
+			}
 		} else {
 			const overlap = prev.width - Math.abs(offX);
-			if (overlap <= 0) { this.gameOver(); return; }
+			if (overlap <= 0) {
+				if (this.mode === 'zen') {
+					cur.mesh.position.x = prev.x;
+					cur.width = prev.width;
+					cur.mesh.geometry.dispose();
+					cur.mesh.geometry = new BoxGeometry(cur.width, BLOCK_HEIGHT, cur.depth);
+					this.combo = 0;
+					this.audio.playCut();
+					cur.x = cur.mesh.position.x;
+					cur.z = cur.mesh.position.z;
+					this.blocks.push(cur);
+					this.currentBlock = null;
+					this.height = this.blocks.length;
+					this.stats.totalBlocks++;
+					this.cameraTargetY = Math.max(5, cur.y + 3);
+					this.updateHUD();
+					this.slideAxis = 'z';
+					this.spawnSlidingBlock();
+					return;
+				}
+				this.gameOver(); return;
+			}
 		}
 
 		const slideOff = this.slideAxis === 'z' ? offZ : offX;
@@ -572,12 +626,20 @@ export class GameSystem extends createSystem({}) {
 			this.combo++;
 			this.score += 10 + this.combo * 5;
 			this.spawnPerfectParticles(cur.mesh.position);
+			this.comboFlashTime = 0.15;
 			if (this.combo >= 5 && this.mode !== 'precision') {
 				cur.width = Math.min(BASE_WIDTH, cur.width + 0.05);
 				cur.depth = Math.min(BASE_DEPTH, cur.depth + 0.05);
 			}
 			this.audio.playPlace(true, this.combo);
 			this.stats.totalPerfects++;
+			// Add dynamic tower light every 5 perfects
+			if (this.combo % 5 === 0 && this.towerLights.length < 8) {
+				const tl = new PointLight(getBlockColor(this.blocks.length), 1.5, 15);
+				tl.position.copy(cur.mesh.position);
+				this.towerGroup.add(tl);
+				this.towerLights.push(tl);
+			}
 		} else {
 			this.combo = 0;
 			this.score += 5;
@@ -743,6 +805,33 @@ export class GameSystem extends createSystem({}) {
 
 		this.updateCamera(delta);
 		if (this.starField) this.starField.rotation.y += delta * 0.005;
+
+		// Environment progression: shift fog/sky hue based on height
+		if (this.state === 'playing' || this.isCountingDown) {
+			const hFactor = Math.min(1, (this.height - 1) / 60);
+			const r = Math.floor(5 + hFactor * 15);
+			const g = Math.floor(5 + hFactor * 5);
+			const b = Math.floor(16 + hFactor * 20);
+			const bgColor = (r << 16) | (g << 8) | b;
+			this.w.scene.background = new Color(bgColor);
+			(this.w.scene.fog as FogExp2).color.set(bgColor);
+		}
+
+		// Combo flash effect
+		if (this.comboFlashTime > 0) {
+			this.comboFlashTime -= delta;
+			const intensity = Math.max(0, this.comboFlashTime / 0.15);
+			for (const tl of this.towerLights) {
+				tl.intensity = 1.5 + intensity * 3;
+			}
+		}
+
+		// Pulse the current sliding block for visibility
+		if (this.currentBlock && this.state === 'playing') {
+			const pulse = 0.3 + Math.sin(_time * 8) * 0.15;
+			(this.currentBlock.mesh.material as MeshStandardMaterial).emissiveIntensity = pulse;
+		}
+
 		this.kb.endFrame();
 	}
 
@@ -762,7 +851,7 @@ export class GameSystem extends createSystem({}) {
 		const bBtn = rg?.getButtonDown(InputComponent.B_Button) || lg?.getButtonDown(InputComponent.B_Button);
 
 		if (this.state === 'playing') {
-			if (this.kb.getKeyDown('Space') || trigger || aBtn) this.placeBlock();
+			if (this.kb.getKeyDown('Space') || this.kb.clicked || trigger || aBtn) this.placeBlock();
 			if (this.kb.getKeyDown('Escape') || bBtn) this.setState('paused');
 		} else if (this.state === 'paused') {
 			if (this.kb.getKeyDown('Escape') || bBtn) this.setState('playing');

@@ -40,7 +40,7 @@
                 "sourceTag": "text",
                 "type": "custom",
                 "children": [
-                  "Press SPACE or TRIGGER to place."
+                  "Tap, click, or press to place."
                 ],
                 "properties": {
                   "fontsize": "14",
@@ -113,7 +113,7 @@
                 "sourceTag": "text",
                 "type": "custom",
                 "children": [
-                  "VR: Trigger / A to place"
+                  "VR: Trigger / A button to place"
                 ],
                 "properties": {
                   "fontsize": "13",
@@ -125,7 +125,7 @@
                 "sourceTag": "text",
                 "type": "custom",
                 "children": [
-                  "VR: B to pause"
+                  "VR: B button to pause"
                 ],
                 "properties": {
                   "fontsize": "13",
@@ -137,7 +137,7 @@
                 "sourceTag": "text",
                 "type": "custom",
                 "children": [
-                  "KB: Space to place"
+                  "Browser: Click / Tap to place"
                 ],
                 "properties": {
                   "fontsize": "13",
@@ -149,7 +149,7 @@
                 "sourceTag": "text",
                 "type": "custom",
                 "children": [
-                  "KB: Escape to pause"
+                  "KB: Space to place, Escape to pause"
                 ],
                 "properties": {
                   "fontsize": "13",
@@ -164,6 +164,55 @@
               "width": "100%"
             },
             "dataUid": "uid-10"
+          },
+          {
+            "sourceTag": "container",
+            "type": "custom",
+            "children": [
+              {
+                "sourceTag": "text",
+                "type": "custom",
+                "children": [
+                  "Tips"
+                ],
+                "properties": {
+                  "fontsize": "16",
+                  "fontweight": "bold",
+                  "color": "#00ff88"
+                },
+                "dataUid": "uid-17"
+              },
+              {
+                "sourceTag": "text",
+                "type": "custom",
+                "children": [
+                  "5+ combo = blocks grow back!"
+                ],
+                "properties": {
+                  "fontsize": "13",
+                  "color": "#ccccdd"
+                },
+                "dataUid": "uid-18"
+              },
+              {
+                "sourceTag": "text",
+                "type": "custom",
+                "children": [
+                  "Try Zen mode for a relaxed session."
+                ],
+                "properties": {
+                  "fontsize": "13",
+                  "color": "#ccccdd"
+                },
+                "dataUid": "uid-19"
+              }
+            ],
+            "properties": {
+              "flexdirection": "column",
+              "gap": "4",
+              "width": "100%"
+            },
+            "dataUid": "uid-16"
           },
           {
             "sourceTag": "text",
@@ -183,7 +232,7 @@
               "bordercolor": "#ff444444",
               "width": "80%"
             },
-            "dataUid": "uid-16"
+            "dataUid": "uid-20"
           }
         ],
         "properties": {
@@ -197,7 +246,7 @@
     ],
     "properties": {
       "width": "480",
-      "height": "500",
+      "height": "540",
       "backgroundcolor": "#0a0a1aee",
       "borderradius": "16",
       "borderwidth": "2",
@@ -214,7 +263,7 @@
         "column": 0
       },
       "end": {
-        "line": 19,
+        "line": 24,
         "column": 8
       }
     },
@@ -224,7 +273,7 @@
         "column": 2
       },
       "end": {
-        "line": 18,
+        "line": 23,
         "column": 14
       }
     },
@@ -265,7 +314,7 @@
       },
       "end": {
         "line": 5,
-        "column": 81
+        "column": 79
       }
     },
     "uid-7": {
@@ -325,7 +374,7 @@
       },
       "end": {
         "line": 12,
-        "column": 73
+        "column": 80
       }
     },
     "uid-13": {
@@ -335,7 +384,7 @@
       },
       "end": {
         "line": 13,
-        "column": 63
+        "column": 70
       }
     },
     "uid-14": {
@@ -345,7 +394,7 @@
       },
       "end": {
         "line": 14,
-        "column": 67
+        "column": 78
       }
     },
     "uid-15": {
@@ -355,7 +404,7 @@
       },
       "end": {
         "line": 15,
-        "column": 68
+        "column": 84
       }
     },
     "uid-16": {
@@ -364,7 +413,47 @@
         "column": 4
       },
       "end": {
-        "line": 17,
+        "line": 21,
+        "column": 16
+      }
+    },
+    "uid-17": {
+      "start": {
+        "line": 18,
+        "column": 6
+      },
+      "end": {
+        "line": 18,
+        "column": 71
+      }
+    },
+    "uid-18": {
+      "start": {
+        "line": 19,
+        "column": 6
+      },
+      "end": {
+        "line": 19,
+        "column": 77
+      }
+    },
+    "uid-19": {
+      "start": {
+        "line": 20,
+        "column": 6
+      },
+      "end": {
+        "line": 20,
+        "column": 84
+      }
+    },
+    "uid-20": {
+      "start": {
+        "line": 22,
+        "column": 4
+      },
+      "end": {
+        "line": 22,
         "column": 203
       }
     }

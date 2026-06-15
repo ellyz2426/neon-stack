@@ -1,19 +1,24 @@
-<panel width="480" height="500" backgroundColor="#0a0a1aee" borderRadius="16" borderWidth="2" borderColor="#44aaff44" padding="24">
+<panel width="480" height="540" backgroundColor="#0a0a1aee" borderRadius="16" borderWidth="2" borderColor="#44aaff44" padding="24">
   <container flexDirection="column" alignItems="center" gap="12" width="100%">
     <text fontSize="28" fontWeight="bold" color="#44aaff">HOW TO PLAY</text>
     <container flexDirection="column" gap="6" width="100%">
       <text fontSize="14" color="#ccccdd">Blocks slide back and forth.</text>
-      <text fontSize="14" color="#ccccdd">Press SPACE or TRIGGER to place.</text>
+      <text fontSize="14" color="#ccccdd">Tap, click, or press to place.</text>
       <text fontSize="14" color="#ccccdd">Any overhang gets cut off!</text>
       <text fontSize="14" color="#00ff88">Perfect = block grows + combo!</text>
       <text fontSize="14" color="#ffaa00">Stack as high as you can!</text>
     </container>
     <container flexDirection="column" gap="4" width="100%">
       <text fontSize="16" fontWeight="bold" color="#ff00ff">Controls</text>
-      <text fontSize="13" color="#ccccdd">VR: Trigger / A to place</text>
-      <text fontSize="13" color="#ccccdd">VR: B to pause</text>
-      <text fontSize="13" color="#ccccdd">KB: Space to place</text>
-      <text fontSize="13" color="#ccccdd">KB: Escape to pause</text>
+      <text fontSize="13" color="#ccccdd">VR: Trigger / A button to place</text>
+      <text fontSize="13" color="#ccccdd">VR: B button to pause</text>
+      <text fontSize="13" color="#ccccdd">Browser: Click / Tap to place</text>
+      <text fontSize="13" color="#ccccdd">KB: Space to place, Escape to pause</text>
+    </container>
+    <container flexDirection="column" gap="4" width="100%">
+      <text fontSize="16" fontWeight="bold" color="#00ff88">Tips</text>
+      <text fontSize="13" color="#ccccdd">5+ combo = blocks grow back!</text>
+      <text fontSize="13" color="#ccccdd">Try Zen mode for a relaxed session.</text>
     </container>
     <text id="btn-tutorial-back" fontSize="18" color="#ff4444" backgroundColor="#ff444422" borderRadius="8" padding="10" textAlign="center" borderWidth="1" borderColor="#ff444444" width="80%">BACK</text>
   </container>

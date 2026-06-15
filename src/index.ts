@@ -6,7 +6,6 @@ async function main() {
 
 	const world = await World.create(container, {
 		xr: { offer: 'once' },
-		browserControls: true,
 		render: {
 			fov: 70,
 			near: 0.01,
